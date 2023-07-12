@@ -1,0 +1,23 @@
+{
+  "default_limits": {
+    "time_seconds": 10,
+    "memory_mb": 512
+  },
+  "listener": {
+    "sleep_timeout_seconds": 3,
+    "langs_refetch_timeout_minutes": 30,
+    "cpu_utilization_fraction": 0.6
+  },
+  "manager": {
+    "attempts_folder": "programs"
+  },
+  "tuner": {
+    "scheduler": {
+      "day_of_week": 0,
+      "hour": 3,
+      "minute": 0
+    },
+    "tests_folder": "tuner_tests",
+    "test_runs_count": 5
+  }
+}

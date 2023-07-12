@@ -1,65 +1,96 @@
+"""Contains Listener for database updates class"""
+
 import subprocess
 import sys
-from time import sleep
 
 import os
-import json
 import asyncio
 import concurrent.futures as pool
+from database import DATABASE
+from settings import SETTINGS_MANAGER
+from typing import List, Any
 
-from utils import connect_to_db
+class Listener:
+    """Listens to database updates"""
+
+    async def _get_pending_items(self, limit: int = 10)-> List[Any]:
+        collection = DATABASE.get_collection(self._pending_attempts_collection_name)
+
+        item_dicts: Any = []
+        async for queue_item in collection.aggregate(
+            [
+                {"$match": {"examined": None}},
+                {"$limit": limit},
+                {"$project": {"author": 1, "task": 1, "attempt": 1}},
+            ]
+        ):
+            item_dicts.append(queue_item)
+
+        await collection.update_many(
+            {"attempt": {"$in": list(map(lambda item: item["attempt"], item_dicts))}},
+            {"$set": {"examined": True}},
+        )
+
+        return item_dicts
+
+    def __init__(self, manager_path: str = os.path.join(".", "manager.py")) -> None:
+        self._manager_path = manager_path
+        self._current_dir = os.path.dirname(os.path.abspath(__file__))
+        self._pending_attempts_collection_name = "pending_task_attempt"
+
+        self.settings = SETTINGS_MANAGER.listener
+        self.cpu_number = os.cpu_count() or 0
+        self.max_workers = max(
+            2,
+            int(self.cpu_number * self.settings.cpu_utilization_fraction),
+        )
+
+    def submit_to_manager(
+        self, attempt_spec: str, author_login: str, task_spec: str
+    ) -> None:
+        """Submits attempt to Manager in separate process
+
+        Args:
+            attempt_spec (str): spec of attempt
+            author_login (str): login of author
+            task_spec (str): spec of task
+
+        """
+        try:
+            subprocess.run(
+                ["python", self._manager_path, attempt_spec, author_login, task_spec],
+                check=True,
+            )
+        except BaseException as exception:  # pylint:disable=W0718
+            print("Listener error", f"Error when starting manager: {exception}")
+
+    async def start(self):
+        """Starts listener loop"""
+
+        try:
+            with pool.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+                while True:
+                    try:
+                        queue_items = await self._get_pending_items()
+                        for queue_item in queue_items:
+                            attempt_spec = queue_item["attempt"]
+                            author_login = queue_item["author"]
+                            task_spec = queue_item["task"]
+
+                            executor.submit(
+                                self.submit_to_manager,
+                                attempt_spec,
+                                author_login,
+                                task_spec,
+                            )
+
+                    except BaseException as exception:  # pylint:disable=W0718
+                        print(exception)
+
+                    await asyncio.sleep(self.settings.sleep_timeout_seconds)
+        except KeyboardInterrupt:
+            print("\nExit")
+            sys.exit(0)
 
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-def run_manager(spec, author, task):
-    global CURRENT_DIR
-    try:
-        subprocess.run(["python", os.path.join(CURRENT_DIR, "manager.py"), spec, author, task], check=True)
-    except BaseException as e:
-        print("Listener error", f"Error when starting manager: {e}")
-
-
-async def take_one(collection):
-    queue_item = await collection.find_one({"examined": None}, {"attempt": True, "author": True, "task": True})
-    if queue_item:
-        await collection.update_one({"attempt": queue_item["attempt"]}, {"$set": {"examined": True}})
-    return queue_item
-
-
-async def listener(configs, database):
-    try:
-        SLEEP_TIMEOUT = int(configs["LISTENER_OPTIONS"]["sleep_timeout_s"] or 3)
-        CPU_NUMBER = os.cpu_count() or 0
-        MAX_WORKERS = max(2, int(CPU_NUMBER * (float(configs["LISTENER_OPTIONS"]["cpu_utilization"] or 0.6))))
-
-        with pool.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            while True:
-                try:
-                    queue_item = await take_one(database["pending_task_attempt"])
-                    if not queue_item:
-                        sleep(SLEEP_TIMEOUT)
-                        continue
-                    attempt_spec = queue_item["attempt"]
-                    author = queue_item["author"]
-                    task = queue_item["task"]
-
-                    executor.submit(run_manager, attempt_spec, author, task)
-
-                except BaseException as e:
-                    print(e)
-                    sleep(SLEEP_TIMEOUT)
-    except KeyboardInterrupt:
-        print("\nExit")
-        sys.exit(0)
-
-
-if __name__ == "__main__":
-    CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.abspath(os.path.join(CURRENT_DIR, "configs.json")), "r") as file:
-        configs = json.load(file)
-
-    database = connect_to_db()
-
-    asyncio.run(listener(configs, database))
+LISTENER = Listener()

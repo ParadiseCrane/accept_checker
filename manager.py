@@ -1,318 +1,427 @@
-from itertools import zip_longest
-import json
-import os
-from checker import custom
+"""Contains Manager for running the checker class"""
+
 import sys
-from checker import checker
 import asyncio
 from math import floor
-import random
 
-from utils import (
-    connect_to_db,
-    create_program_file,
-    delete_program_folder,
-    generate_program_path,
-    get_extension,
-    get_module,
+import os
+from typing import Dict, List, Optional, Tuple, Any, Callable, Coroutine
+from checker.custom_checker import CustomChecker
+from checker.tests import TestsChecker
+from checker.text import TextChecker
+
+from models import Attempt, Language, PendingQueueItem
+
+from utils.basic import (
+    delete_folder,
+    generate_tests_verdicts,
+    create_program_folder,
+    map_attempt_status,
+    map_verdict,
     send_alert,
 )
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.abspath(os.path.join(CURRENT_DIR, "configs.json")), "r") as file:
-    cnf = json.load(file)
-    langs_configs = cnf["LANGS"]
-    attempts_folder = cnf["MANAGER_OPTIONS"]["attempts_folder"]
+
+from database import DATABASE
+from settings import SETTINGS_MANAGER
 
 
-FOLDER = attempts_folder or "programs"
-
-database = connect_to_db()
-
-
-async def save_status(attempt_spec, database):
-    status_collection = database["user_task_status"]
-    result = await status_collection.find_one({"attempt": attempt_spec})
-    if result:
-        await status_collection.update_one({"attempt": attempt_spec}, {"$set": {"status": 2}})
-
-
-async def save_attempt_results(spec, tests, results, logs, collection):
-    for i in range(len(tests)):
-        tests[i]["verdict"] = results[i]
-
-    verdict = 0
-    verdictTest = 0
-    for result in tests:
-        verdictTest += 1
-        if result["verdict"] != 0:
-            verdict = result["verdict"]
-            break
-
-    await collection.update_one(
-        {"spec": spec}, {"$set": {"status": 2, "verdict": verdict, "results": tests, "logs": logs}}
-    )
-
-    return (verdict, verdictTest)
-
-
-async def save_task_results(attempt, author: str, task: str, results, verdict, verdictTest, database):
-    spec = attempt["spec"]
-    collection = database["user_task_result"]
-
-    passedTests = len(list(filter(lambda result: result == 0, results)))
-    percentTests = floor(passedTests / len(results) * 100)
-
-    current_attempt = {
-        "attempt": spec,
-        "date": attempt["date"],
-        "passedTests": passedTests,
-        "percentTests": percentTests,
-        "verdict": verdict,
-        "verdictTest": verdictTest,
-    }
-
-    results_db = await collection.find_one({"task": task, "user": author})
-
-    if not results_db or len(results_db["bests"]) == 0:
-        best = None
-    else:
-        best = results_db["bests"][-1]
-
-    new_best = None
-    if best and (best["verdict"] == verdict == 0 or best["percentTests"] > percentTests):
-        new_best = best
-        new_best["date"] = attempt["date"]
-    else:
-        new_best = current_attempt
-
-    if (not best or best["verdict"] != 0) and new_best["verdict"] == 0:
-        await database["rating"].update_one({"user": author}, {"$inc": {"score": 1}}, True)
-
-    if not results_db:
-        await collection.insert_one({"task": task, "user": author, "results": [current_attempt], "bests": [new_best]})
-    else:
-        await collection.update_one(
-            {"task": task, "user": author}, {"$push": {"results": current_attempt, "bests": new_best}}
-        )
-
-    return True
-
-
-async def set_testing(spec, collection):
-    result = await collection.update_one({"spec": spec}, {"$set": {"status": 1}})
-    status_collection = database["user_task_status"]
-    status_result = await status_collection.find_one({"attempt": spec})
-    if status_result:
-        await status_collection.update_one({"attempt": spec}, {"$set": {"status": 1}})
-
-    return result.matched_count == 1
-
-
-async def delete_from_pending(spec, collection):
-    result = await collection.delete_one({"attempt": spec})
-    return result.deleted_count == 1
-
-
-async def save_results(attempt, author, task, tests, results, logs):
-    collection = database["attempt"]
-    spec = attempt["spec"]
-    await delete_from_pending(spec, database["pending_task_attempt"])
-    (verdict, verdictTest) = await save_attempt_results(spec, tests, results, logs, collection)
-    await save_task_results(attempt, author, task, results, verdict, verdictTest, database)
-    await save_status(spec, database)
-    return True
-
-
-def soft_run(func):
-    async def inner(attempt, author: str, task: str, *args):
+def _soft_run(func: Callable[..., Any]) -> Callable[..., Coroutine[Any, Any, Any]]:
+    async def inner(
+        self,
+        attempt: Attempt,
+        author_login: str,
+        task_spec: str,
+        *args: Tuple[Any, ...],
+        **kwargs: Dict[str, Any],
+    ):
         try:
-            await func(attempt, author, task, *args)
-        except BaseException as e:
-            tests = attempt["results"]
-            spec = attempt["spec"]
-            await send_alert("ManagerError", f"{spec}\n{e}")
-            delete_program_folder(generate_program_path(FOLDER, spec))
+            await func(
+                self,
+                attempt,
+                author_login,
+                task_spec,
+                *args,
+                **kwargs,
+            )
+        except BaseException as manager_exc:  # pylint: disable=W0718
+            results = attempt.results
+            await send_alert("ManagerError", f"{attempt.spec}\n{manager_exc}")
+            # TODO: delete folder
             try:
-                await save_results(spec, author, task, tests, [5] * len(tests), [str(e)])
-            except:
-                await send_alert("ManagerError (when saving results)", f"{spec}\n{str(e)}")
-            return False
+                await self._save_results(  # pylint:disable=W0212:protected-access
+                    attempt,
+                    author_login,
+                    task_spec,
+                    generate_tests_verdicts("SE", len(results)),
+                    [str(manager_exc)],
+                )
+            except BaseException as saving_exception:  # pylint: disable=W0718
+                await send_alert(
+                    "ManagerError (when saving results)",
+                    f"{attempt.spec}\n{str(saving_exception)}",
+                )
 
     return inner
 
 
-def get_constraints(attempt):
-    constraints_time = None
-    constraints_memory = None
-    constraints = attempt["constraints"]
-    if constraints:
-        constraints_time = constraints["time"]
-        constraints_memory = constraints["memory"]
-    return constraints_time, constraints_memory
+class Manager:
+    """Manages different checkers and task types"""
 
+    async def _set_testing(
+        self, attempt: Attempt, author_login: str, task_spec: str
+    ) -> bool:
+        status = map_attempt_status("testing")
+        attempt_result, _ = await asyncio.gather(
+            *[
+                DATABASE.update_one(
+                    "attempt", {"spec": attempt.spec}, {"$set": {"status": status}}
+                ),
+                DATABASE.update_one(
+                    "user_task_status",
+                    {"attempt": attempt.spec},
+                    {"$set": {"status": status}},
+                ),
+            ]
+        )
 
-def get_offsets(language):
-    compile_offset = language["compileOffset"]
-    run_offset = language["runOffset"]
-    mem_offset = language["memOffset"]
-    return compile_offset, run_offset, mem_offset
+        is_testing_set = attempt_result.modified_count == 1
 
+        if not is_testing_set:
+            await self._save_results(
+                attempt,
+                author_login,
+                task_spec,
+                generate_tests_verdicts("NT", len(attempt.results)),
+                ["Error in setting testing status"],
+            )
 
-@soft_run
-async def tests_checker(attempt, author: str, task: str, language) -> bool:
-    folder_path = None
-    collection = database["attempt"]
+        return is_testing_set
 
-    constraints = get_constraints(attempt)
-    offsets = get_offsets(language)
-    spec = attempt["spec"]
-    tests = attempt["results"]
-    lang = language["shortName"]
+    async def _save_attempt_results(
+        self,
+        attempt_spec: str,
+        results: List[Attempt.Result],
+        verdicts: List[int],
+        logs: List[str],
+    ):
+        for idx, result in enumerate(results):
+            results[idx].verdict = verdicts[idx]
 
-    """ Setup files """
-    module_name, module_spec = get_module(lang, langs_configs)
-    extension = get_extension(module_spec)
+        attempt_final_verdict = 0
+        attempt_final_verdict_test = 0
 
-    program_path, folder_path = create_program_file(FOLDER, spec, extension, attempt["programText"])
+        for result in results:
+            attempt_final_verdict_test += 1
+            if result.verdict != 0:
+                attempt_final_verdict = result.verdict
+                break
 
-    """ Run checker """
-    is_set = await set_testing(spec, collection)
-    if not is_set:
-        return False
-    results, logs = checker(
-        module_spec,
-        folder_path,
-        spec,
-        tests,
-        constraints,
-        offsets,
-    )
-    delete_program_folder(folder_path)
+        results_dict = [result.to_dict() for result in results]
+        await DATABASE.update_one(
+            "attempt",
+            {"spec": attempt_spec},
+            {
+                "$set": {
+                    "status": map_attempt_status("finished"),
+                    "verdict": attempt_final_verdict,
+                    "results": results_dict,
+                    "logs": logs,
+                }
+            },
+        )
 
-    """ Save result """
-    return await save_results(attempt, author, task, tests, results, logs)
+        return attempt_final_verdict, attempt_final_verdict_test
 
+    async def _save_task_results(
+        self,
+        attempt: Attempt,
+        author_login: str,
+        task_spec: str,
+        verdicts: List[int],
+        attempt_final_verdict: int,
+        attempt_final_verdict_test: int,
+    ):
+        ok_verdict_spec = map_verdict("OK")
+        passed_tests = len(
+            list(filter(lambda verdict: verdict == ok_verdict_spec, verdicts))
+        )
+        percent_tests = floor(passed_tests / len(verdicts) * 100)
 
-def compare_strings(test: str, answer: str) -> int:
-    test_strings = map(lambda x: x.strip(), test.strip().split("\n"))
-    answer_strings = map(lambda x: x.strip(), answer.strip().split("\n"))
-    for t, a in zip_longest(test_strings, answer_strings):
-        if t != a:
-            return 2
-    return 0
+        current_attempt = {
+            "attempt": attempt.spec,
+            "date": attempt.date,
+            "passedTests": passed_tests,
+            "percentTests": percent_tests,
+            "verdict": attempt_final_verdict,
+            "verdictTest": attempt_final_verdict_test,
+        }
 
+        user_task_result_collection = DATABASE.get_collection("user_task_result")
 
-@soft_run
-async def text_checker(attempt, author, task) -> bool:
-    collection = database["attempt"]
+        user_task_result_dict = await user_task_result_collection.find_one(
+            {"task": task_spec, "user": author_login}
+        )
 
-    tests = attempt["results"]
-    spec = attempt["spec"]
-    answers = attempt["textAnswers"]
-    answers_length = len(answers)
-
-    """ Run checker """
-    is_set = await set_testing(spec, collection)
-    if not is_set:
-        return False
-
-    results = []
-    for i, test_result in enumerate(tests):
-        if i >= answers_length:
-            results.append(2)  # WA
+        if not user_task_result_dict or len(user_task_result_dict["bests"]) == 0:
+            best_attempt = None
         else:
-            results.append(compare_strings(test_result["test"]["outputData"], answers[i]))
+            best_attempt = user_task_result_dict["bests"][-1]
 
-    """ Save result """
-    return await save_results(attempt, author, task, tests, results, [])
+        new_best_attempt = None
+        if best_attempt and (
+            best_attempt["verdict"] == attempt_final_verdict == ok_verdict_spec
+            or best_attempt["percentTests"] > percent_tests
+        ):
+            new_best_attempt = best_attempt
+            new_best_attempt["date"] = attempt.date
+        else:
+            new_best_attempt = current_attempt
+
+        database_actions: Any = []
+
+        if (not best_attempt or best_attempt["verdict"] != 0) and new_best_attempt[
+            "verdict"
+        ] == 0:
+            database_actions.append(
+                DATABASE.update_one(
+                    "rating", {"user": author_login}, {"$inc": {"score": 1}}, True
+                )
+            )
+
+        if not user_task_result_dict:
+            database_actions.append(
+                user_task_result_collection.insert_one(
+                    {
+                        "task": task_spec,
+                        "user": author_login,
+                        "results": [current_attempt],
+                        "bests": [new_best_attempt],
+                    }
+                )
+            )
+
+        else:
+            database_actions.append(
+                user_task_result_collection.update_one(
+                    {"task": task_spec, "user": author_login},
+                    {"$push": {"results": current_attempt, "bests": new_best_attempt}},
+                )
+            )
+
+        await asyncio.gather(*database_actions)
+
+    async def _save_results(
+        self,
+        attempt: Attempt,
+        author_login: str,
+        task_spec: str,
+        verdicts: List[int],
+        logs: List[str],
+    ):
+        _, attempt_final_info = await asyncio.gather(
+            *[
+                DATABASE.delete_one("pending_task_attempt", {"attempt": attempt.spec}),
+                self._save_attempt_results(
+                    attempt.spec, attempt.results, verdicts, logs
+                ),
+            ]
+        )
+
+        attempt_final_verdict, attempt_final_verdict_test = attempt_final_info
+
+        await asyncio.gather(
+            *[
+                self._save_task_results(
+                    attempt,
+                    author_login,
+                    task_spec,
+                    verdicts,
+                    attempt_final_verdict,
+                    attempt_final_verdict_test,
+                ),
+                DATABASE.update_one(
+                    "user_task_status",
+                    {"attempt": attempt.spec},
+                    {"$set": {"status": map_attempt_status("finished")}},
+                ),
+            ]
+        )
+
+    def _get_constraints(
+        self, attempt: Attempt
+    ) -> Tuple[Optional[float], Optional[float]]:
+        constraints = attempt.constraints
+        return constraints.time, constraints.memory
+
+    def _get_offsets(self, language_dict: Dict[str, Any]) -> Tuple[float, float, float]:
+        return (
+            language_dict["compileOffset"],
+            language_dict["runOffset"],
+            language_dict["memOffset"],
+        )
+
+    async def _handle_code_task(
+        self,
+        attempt: Attempt,
+        author_login: str,
+        task_spec: str,
+        queue_item: PendingQueueItem,
+    ):
+        check_type = queue_item.task_check_type
+
+        await self._task_check_type_handler[check_type](
+            attempt, author_login, task_spec, queue_item
+        )
+
+    @_soft_run
+    async def _handle_text_task(
+        self,
+        attempt: Attempt,
+        author_login: str,
+        task_spec: str,
+        _queue_item: PendingQueueItem,
+    ):
+        is_set_testing = await self._set_testing(attempt, author_login, task_spec)
+        if not is_set_testing:
+            return
+
+        user_answers: List[str] = attempt.text_answers
+
+        correct_answers: List[str] = [
+            result.test.output_data for result in attempt.results
+        ]
+
+        text_checker = self.text_checker_class()
+        verdicts, logs = await text_checker.start(user_answers, correct_answers)
+        await self._save_results(attempt, author_login, task_spec, verdicts, logs)
+
+    @_soft_run
+    async def _handle_tests_checker(
+        self,
+        attempt: Attempt,
+        author_login: str,
+        task_spec: str,
+        _queue_item: PendingQueueItem,
+    ):
+        is_set = await self._set_testing(attempt, author_login, task_spec)
+        if not is_set:
+            return
+
+        language_dict = await DATABASE.find_one("language", {"spec": attempt.language})
+        language = Language(language_dict)
+
+        folder_path = create_program_folder(attempt.spec)
+
+        tests_checker = self.tests_checker_class()
+
+        verdicts, logs = await tests_checker.start(
+            attempt,
+            folder_path,
+            language,
+        )
+
+        delete_folder(folder_path)
+
+        await self._save_results(attempt, author_login, task_spec, verdicts, logs)
+
+    @_soft_run
+    async def _handle_custom_checker(
+        self,
+        attempt: Attempt,
+        author_login: str,
+        task_spec: str,
+        queue_item: PendingQueueItem,
+    ):
+        is_set = await self._set_testing(attempt, author_login, task_spec)
+        if not is_set:
+            return
+
+        if not queue_item.checker:
+            await self._save_results(
+                attempt,
+                author_login,
+                task_spec,
+                generate_tests_verdicts("NT", len(attempt.results)),
+                ["Error in setting testing status"],
+            )
+            return
+
+        program_language_dict, checker_language_dict = await asyncio.gather(
+            *[
+                DATABASE.find_one("language", {"spec": attempt.language}),
+                DATABASE.find_one("language", {"spec": queue_item.checker.language}),
+            ]
+        )
+        program_language = Language(program_language_dict)
+        checker_language = Language(checker_language_dict)
+
+        folder_path = create_program_folder(attempt.spec)
+
+        custom_checker_ = self.custom_checker_class()
+
+        verdicts, logs = await custom_checker_.start(
+            queue_item.checker, attempt, folder_path, program_language, checker_language
+        )
+
+        delete_folder(folder_path)
+
+        await self._save_results(attempt, author_login, task_spec, verdicts, logs)
+
+    def __init__(self) -> None:
+        self._current_dir = os.path.dirname(os.path.abspath(__file__))
+        self._task_type_handler = {
+            0: self._handle_code_task,
+            1: self._handle_text_task,
+        }
+
+        self._task_check_type_handler = {
+            0: self._handle_tests_checker,
+            1: self._handle_custom_checker,
+        }
+
+        self.text_checker_class = TextChecker
+        self.tests_checker_class = TestsChecker
+        self.custom_checker_class = CustomChecker
+
+        self.settings = SETTINGS_MANAGER.manager
+
+    async def start(self, attempt_spec: str, author_login: str, task_spec: str):
+        """Starts Manager for given pending item
+
+        Args:
+            attempt_spec (str): attempt spec
+            author_login (str): author login
+            task_spec (str): task spec
+        """
+
+        attempt_dict, queue_item_dict = await asyncio.gather(
+            *[
+                DATABASE.find_one("attempt", {"spec": attempt_spec}),
+                DATABASE.find_one(
+                    "pending_task_attempt",
+                    {"attempt": attempt_spec},
+                    {"taskType": 1, "taskCheckType": 1, "checker": 1},
+                ),
+            ]
+        )
+
+        queue_item = PendingQueueItem(queue_item_dict)
+        attempt = Attempt(attempt_dict)
+
+        task_type = int(queue_item_dict["taskType"])
+
+        await self._task_type_handler[task_type](
+            attempt,
+            author_login,
+            task_spec,
+            queue_item,
+        )
 
 
-CHECKER_NAME = "checker"
-
-
-@soft_run
-async def custom_checker(attempt, author: str, task: str, language, checker) -> bool:
-    checker_code = checker["sourceCode"]
-    checker_lang = checker["language"]
-
-    spec = attempt["spec"]
-    collection = database["attempt"]
-
-    tests = attempt["results"]
-
-    if not checker_code:
-        return await save_results(attempt, author, task, tests, [6] * len(tests), ["No checker specified"])
-
-    constraints = get_constraints(attempt)
-
-    offsets = get_offsets(language)
-
-    lang = language["shortName"]
-
-    checker_offsets = get_offsets(checker_lang)
-
-    """ Setup files """
-    module_name, module_spec = get_module(lang, langs_configs)
-    extension = get_extension(module_spec)
-
-    module_name, checker_module_spec = get_module(checker_lang["shortName"], langs_configs)
-    checker_extension = get_extension(checker_module_spec)
-
-    program_path, folder_path = create_program_file(FOLDER, spec, extension, attempt["programText"])
-    with open(os.path.join(folder_path, f"{CHECKER_NAME}.{checker_extension}"), "w") as custom_checker_f:
-        custom_checker_f.write(checker_code)
-
-    """ Run checker """
-    is_set = await set_testing(spec, collection)
-    if not is_set:
-        return False
-    results, logs = custom(
-        module_spec,
-        folder_path,
-        spec,
-        tests,
-        constraints,
-        offsets,
-        checker_module_spec,
-        CHECKER_NAME,
-        checker_offsets,
-    )
-    delete_program_folder(folder_path)
-
-    """ Save result """
-    return await save_results(attempt, author, task, tests, results, logs)
-
-
-async def start(*args):
-    attempt_spec = args[1]
-    author = args[2]
-    task = args[3]
-
-    attempt = await database["attempt"].find_one({"spec": attempt_spec})
-
-    queue_item = await database["pending_task_attempt"].find_one({"attempt": attempt_spec})
-
-    task_type = queue_item["taskType"]
-    check_type = queue_item["taskCheckType"]
-
-    if task_type == 0:  # code
-
-        language = await database["language"].find_one({"spec": attempt["language"]})
-        if check_type == 0:
-            await tests_checker(attempt, author, task, language)
-        else:  # check_type == 1
-            checker = queue_item["checker"]
-            checker_language = await database["language"].find_one({"spec": checker["language"]})
-            checker["language"] = checker_language
-            if checker:
-                await custom_checker(attempt, author, task, language, checker)
-            else:
-                await custom_checker(attempt, author, task, language, None)
-
-    elif task_type == 1:  # text
-        await text_checker(attempt, author, task)
-
+MANAGER = Manager()
 
 if __name__ == "__main__":
-    asyncio.run(start(*sys.argv))
+    *_, attempt_spec_arg, author_login_arg, task_spec_arg = sys.argv
+
+    asyncio.run(MANAGER.start(attempt_spec_arg, author_login_arg, task_spec_arg))
