@@ -43,6 +43,15 @@ class PendingQueueItem:
         }
 
 
+class TaskTest:
+    """Task test model"""
+
+    def __init__(self, test_dict: Dict[str, Any]) -> None:
+        self.spec: str = test_dict["spec"]
+        self.input_data: str = test_dict["inputData"]
+        self.output_data: str = test_dict["outputData"]
+
+
 class Attempt:
     """Attempt model"""
 
@@ -67,23 +76,8 @@ class Attempt:
     class Result:
         """Attempt result model"""
 
-        class Test:
-            """Result test model"""
-
-            def __init__(self, test_dict: Dict[str, Any]) -> None:
-                self.input_data: str = test_dict["inputData"]
-                self.output_data: str = test_dict["outputData"]
-
-            def to_dict(self):
-                """Converts class to dict object
-
-                Returns:
-                    dict
-                """
-                return {"inputData": self.input_data, "outputData": self.output_data}
-
         def __init__(self, result_dict: Dict[str, Any]):
-            self.test = self.Test(result_dict["test"])
+            self.test: str = result_dict["test"]
             self.verdict: int = result_dict["verdict"]
 
         def to_dict(self):
@@ -93,7 +87,7 @@ class Attempt:
                 dict
             """
             return {
-                "test": self.test.to_dict(),
+                "test": self.test,
                 "verdict": self.verdict,
             }
 
