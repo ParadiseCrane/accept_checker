@@ -13,7 +13,7 @@ from custom_exceptions import (
     TimeLimitException,
 )
 from custom_process import CustomProcess
-from models import Attempt, Language
+from models import Attempt, Language, TaskTest
 from utils.basic import VerdictType, generate_tests_verdicts, map_verdict
 
 
@@ -116,13 +116,18 @@ class CodeChecker(Checker):
             raise CompilationErrorException from exc
 
     def _run_test(
-        self, process: CustomProcess, index: int, attempt: Attempt, language: Language
+        self,
+        process: CustomProcess,
+        index: int,
+        attempt: Attempt,
+        task_tests: List[TaskTest],
+        language: Language,
     ) -> Tuple[int, Optional[VerdictType], Optional[str]]:
         verdict = None
         result = None
         try:
             result = process.run(
-                input_data=attempt.results[index].test.input_data,
+                input_data=task_tests[index].input_data,
                 time_limit=attempt.constraints.time,
                 time_offset=language.run_offset,
                 memory_offset=language.mem_offset,
@@ -144,7 +149,7 @@ class CodeChecker(Checker):
 
     def _check_test(
         self,
-        attempt: Attempt,
+        task_tests: List[TaskTest],
         index: int,
         verdict: Optional[VerdictType],
         program_output: Optional[str],
@@ -155,23 +160,29 @@ class CodeChecker(Checker):
         if program_output is None:
             return map_verdict("WA")
 
-        if self._compare_strings(
-            program_output, attempt.results[index].test.output_data
-        ):
+        if self._compare_strings(program_output, task_tests[index].output_data):
             return map_verdict("OK")
         return map_verdict("WA")
 
     def _process_test(
-        self, process: CustomProcess, index: int, attempt: Attempt, language: Language
+        self,
+        process: CustomProcess,
+        index: int,
+        attempt: Attempt,
+        task_tests: List[TaskTest],
+        language: Language,
     ) -> Tuple[int, int]:
-        index, verdict, result = self._run_test(process, index, attempt, language)
-        return index, self._check_test(attempt, index, verdict, result)
+        index, verdict, result = self._run_test(
+            process, index, attempt, task_tests, language
+        )
+        return index, self._check_test(task_tests, index, verdict, result)
 
     def run_tests(
         self,
         folder_path: str,
         program_name: str,
         attempt: Attempt,
+        task_tests: List[TaskTest],
         language: Language,
         language_class: ProgramLanguage,
     ) -> List[int]:
@@ -181,6 +192,7 @@ class CodeChecker(Checker):
             folder_path (str): path to the testing folder
             program_name (str): name of the program
             attempt (Attempt): user's attempt
+            task_tests (List[TaskTest]): tests of task
             language (Language): language of the attempt
             language_class (ProgramLanguage): language class
 
@@ -206,6 +218,7 @@ class CodeChecker(Checker):
                         process,
                         index,
                         attempt,
+                        task_tests,
                         language,
                     )
                 )

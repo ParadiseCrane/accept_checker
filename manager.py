@@ -3,15 +3,14 @@
 import sys
 import asyncio
 from math import floor
-
 import os
 from typing import Dict, List, Optional, Tuple, Any, Callable, Coroutine
+from settings import SETTINGS_MANAGER
 from checker.custom_checker import CustomChecker
 from checker.tests import TestsChecker
 from checker.text import TextChecker
-
-from models import Attempt, Language, PendingQueueItem
-
+from models import Attempt, Language, PendingQueueItem, TaskTest
+from database import DATABASE
 from utils.basic import (
     delete_folder,
     generate_tests_verdicts,
@@ -20,10 +19,6 @@ from utils.basic import (
     map_verdict,
     send_alert,
 )
-
-
-from database import DATABASE
-from settings import SETTINGS_MANAGER
 
 
 def _soft_run(func: Callable[..., Any]) -> Callable[..., Coroutine[Any, Any, Any]]:
@@ -266,12 +261,13 @@ class Manager:
         attempt: Attempt,
         author_login: str,
         task_spec: str,
+        task_tests: List[TaskTest],
         queue_item: PendingQueueItem,
     ):
         check_type = queue_item.task_check_type
 
         await self._task_check_type_handler[check_type](
-            attempt, author_login, task_spec, queue_item
+            attempt, author_login, task_spec, task_tests, queue_item
         )
 
     @_soft_run
@@ -280,6 +276,7 @@ class Manager:
         attempt: Attempt,
         author_login: str,
         task_spec: str,
+        task_tests: List[TaskTest],
         _queue_item: PendingQueueItem,
     ):
         is_set_testing = await self._set_testing(attempt, author_login, task_spec)
@@ -288,9 +285,7 @@ class Manager:
 
         user_answers: List[str] = attempt.text_answers
 
-        correct_answers: List[str] = [
-            result.test.output_data for result in attempt.results
-        ]
+        correct_answers: List[str] = [task_test.output_data for task_test in task_tests]
 
         text_checker = self.text_checker_class()
         verdicts, logs = await text_checker.start(user_answers, correct_answers)
@@ -302,6 +297,7 @@ class Manager:
         attempt: Attempt,
         author_login: str,
         task_spec: str,
+        task_tests: List[TaskTest],
         _queue_item: PendingQueueItem,
     ):
         is_set = await self._set_testing(attempt, author_login, task_spec)
@@ -317,6 +313,7 @@ class Manager:
 
         verdicts, logs = await tests_checker.start(
             attempt,
+            task_tests,
             folder_path,
             language,
         )
@@ -331,6 +328,7 @@ class Manager:
         attempt: Attempt,
         author_login: str,
         task_spec: str,
+        task_tests: List[TaskTest],
         queue_item: PendingQueueItem,
     ):
         is_set = await self._set_testing(attempt, author_login, task_spec)
@@ -361,7 +359,12 @@ class Manager:
         custom_checker_ = self.custom_checker_class()
 
         verdicts, logs = await custom_checker_.start(
-            queue_item.checker, attempt, folder_path, program_language, checker_language
+            queue_item.checker,
+            attempt,
+            task_tests,
+            folder_path,
+            program_language,
+            checker_language,
         )
 
         delete_folder(folder_path)
@@ -409,12 +412,24 @@ class Manager:
         queue_item = PendingQueueItem(queue_item_dict)
         attempt = Attempt(attempt_dict)
 
+        task_tests_specs = [result.test for result in attempt.results]
+        task_tests_map: Dict[str, TaskTest] = dict()  # spec : TaskTest
+        for task_test_dict in await DATABASE.find(
+            "task_test", {"spec": {"$in": task_tests_specs}}
+        ):
+            task_tests_map[task_test_dict["spec"]] = TaskTest(task_test_dict)
+
+        task_tests: List[TaskTest] = [
+            task_tests_map[result.test] for result in attempt.results
+        ]
+
         task_type = int(queue_item_dict["taskType"])
 
         await self._task_type_handler[task_type](
             attempt,
             author_login,
             task_spec,
+            task_tests,
             queue_item,
         )
 
