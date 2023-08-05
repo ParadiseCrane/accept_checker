@@ -1,0 +1,6 @@
+[MASTER]
+jobs=4
+[MESSAGES CONTROL]
+disable=missing-function-docstring,missing-class-docstring,missing-module-docstring,broad-exception-caught,too-few-public-methods,unknown-option-value,broad-exception-raised
+[BASIC]
+good-names=Authorize

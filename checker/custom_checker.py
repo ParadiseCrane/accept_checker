@@ -1,17 +1,18 @@
 """Contains Custom checker class"""
 
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
+
 from checker.basic import CodeChecker
+from custom_exceptions import CompilationErrorException
 from custom_process import CustomProcess
-from program_languages.utils import get_language_class
 from models import Attempt, Language, PendingQueueItem, TaskTest
+from program_languages.utils import get_language_class
 from utils.basic import (
     VerdictType,
     generate_program_name,
     generate_tests_verdicts,
     map_verdict,
 )
-from custom_exceptions import CompilationErrorException
 
 
 class CustomChecker(CodeChecker):

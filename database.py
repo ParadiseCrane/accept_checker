@@ -1,8 +1,9 @@
 """Contains MongoDB database class instances"""
 
-from typing import Dict, Optional, Any, List
-import motor.motor_asyncio
 import asyncio
+from typing import Any, Dict, List, Optional
+
+import motor.motor_asyncio
 
 from local_secrets import SECRETS_MANAGER
 

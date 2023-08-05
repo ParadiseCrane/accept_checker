@@ -1,9 +1,9 @@
 """Contains the SettingsManager class instances"""
-import os
 import json
+import os
+from typing import Any, Dict
 
 from utils.soft_mkdir import soft_mkdir
-from typing import Any, Dict
 
 
 class ManagerSettings:

@@ -1,8 +1,9 @@
 """Contains the SecretsManager class instances"""
 
 import os
-import dotenv
 from typing import Any, Dict
+
+import dotenv
 
 
 class SecretsManager:

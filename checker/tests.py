@@ -1,12 +1,11 @@
 """Contains Tests Checker class"""
 
-from typing import Tuple, List
+from typing import List, Tuple
+
 from checker.basic import CodeChecker
-from program_languages.utils import get_language_class
-from custom_exceptions import (
-    CompilationErrorException,
-)
+from custom_exceptions import CompilationErrorException
 from models import Attempt, Language, TaskTest
+from program_languages.utils import get_language_class
 from utils.basic import generate_program_name, generate_tests_verdicts, map_verdict
 
 

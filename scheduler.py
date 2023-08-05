@@ -2,14 +2,12 @@
 
 from typing import Optional
 
+import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-import pytz
 from date import DATE_TIME_INFO
-
-
 from settings import SETTINGS_MANAGER
 from tuner import Tuner
 

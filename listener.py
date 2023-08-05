@@ -1,14 +1,14 @@
 """Contains Listener for database updates class"""
 
-import subprocess
-import sys
-
-import os
 import asyncio
 import concurrent.futures as pool
+import os
+import subprocess
+import sys
+from typing import Any, List
+
 from database import DATABASE
 from settings import SETTINGS_MANAGER
-from typing import List, Any
 
 
 class Listener:

@@ -1,6 +1,6 @@
 """Contains Basic Language class"""
 
-from typing import List, Tuple, Any
+from typing import Any, List, Tuple
 
 
 class ProgramLanguage:

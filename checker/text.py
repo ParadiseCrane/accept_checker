@@ -1,8 +1,8 @@
 """Contains Text Checker class"""
 
 from typing import List, Tuple
-from checker.basic import Checker
 
+from checker.basic import Checker
 from utils.basic import generate_tests_verdicts, group_values, map_verdict
 
 

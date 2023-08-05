@@ -1,5 +1,5 @@
 """Contains data models"""
-from typing import List, Any, Dict
+from typing import Any, Dict, List
 
 
 class PendingQueueItem:

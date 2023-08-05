@@ -1,10 +1,10 @@
 """Contains Checker abstract class"""
 
-from itertools import zip_longest
-import os
 import concurrent.futures as pool
-from typing import Optional, List, Tuple, Any
-from program_languages.basic import ProgramLanguage
+import os
+from itertools import zip_longest
+from typing import Any, List, Optional, Tuple
+
 from custom_exceptions import (
     CompilationErrorException,
     MemoryLimitException,
@@ -14,6 +14,7 @@ from custom_exceptions import (
 )
 from custom_process import CustomProcess
 from models import Attempt, Language, TaskTest
+from program_languages.basic import ProgramLanguage
 from utils.basic import VerdictType, generate_tests_verdicts, map_verdict
 
 

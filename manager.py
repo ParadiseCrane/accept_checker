@@ -1,20 +1,21 @@
 """Contains Manager for running the checker class"""
 
-import sys
 import asyncio
-from math import floor
 import os
-from typing import Dict, List, Optional, Tuple, Any, Callable, Coroutine
-from settings import SETTINGS_MANAGER
+import sys
+from math import floor
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple
+
 from checker.custom_checker import CustomChecker
 from checker.tests import TestsChecker
 from checker.text import TextChecker
-from models import Attempt, Language, PendingQueueItem, TaskTest
 from database import DATABASE
+from models import Attempt, Language, PendingQueueItem, TaskTest
+from settings import SETTINGS_MANAGER
 from utils.basic import (
+    create_program_folder,
     delete_folder,
     generate_tests_verdicts,
-    create_program_folder,
     group_values,
     map_attempt_status,
     map_verdict,

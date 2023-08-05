@@ -1,21 +1,23 @@
 """Contains Tuner class"""
 
-import shutil
-import concurrent.futures as pool
-from typing import Tuple, Callable, List, Any
-import os
-import subprocess
-from datetime import datetime
-import time
-import psutil
 import asyncio
+import concurrent.futures as pool
+import os
+import shutil
+import subprocess
+import time
+from datetime import datetime
+from typing import Any, Callable, List, Tuple
+
+import psutil
+
 from database import DATABASE
 from date import DATE_TIME_INFO
+from models import Language
 from program_languages.basic import ProgramLanguage
 from program_languages.utils import get_language_class
-from models import Language
 from settings import SETTINGS_MANAGER
-from utils.basic import send_alert, kill_process_tree
+from utils.basic import kill_process_tree, send_alert
 from utils.soft_mkdir import soft_mkdir
 
 
@@ -61,9 +63,7 @@ class Tuner:
             pass
         return cpu_time_usage + self.test_sleep_seconds
 
-    def _mem_test(
-        self, process: psutil.Popen, language_class: ProgramLanguage
-    ) -> float:
+    def _mem_test(self, process: psutil.Popen, language_class: ProgramLanguage) -> float:
         memory_usage = 0
         total_sleep = 0
 
