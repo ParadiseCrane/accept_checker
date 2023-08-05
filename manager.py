@@ -18,6 +18,7 @@ from utils.basic import (
     group_values,
     map_attempt_status,
     map_verdict,
+    prepare_test_groups,
     send_alert,
 )
 
@@ -107,8 +108,8 @@ class Manager:
 
         for result in results:
             attempt_final_verdict_test += 1
+            attempt_final_verdict = result.verdict
             if result.verdict != 0:
-                attempt_final_verdict = result.verdict
                 break
         return attempt_final_verdict, attempt_final_verdict_test
 
@@ -424,7 +425,7 @@ class Manager:
                 DATABASE.find_one(
                     "task",
                     {"spec": task_spec},
-                    {"test_groups": 1},
+                    {"test_groups": 1, "tests": 1},
                 ),
             ]
         )
@@ -432,7 +433,9 @@ class Manager:
         queue_item = PendingQueueItem(queue_item_dict)
         attempt = Attempt(attempt_dict)
 
-        test_groups: List[int] = task_dict["test_groups"]
+        test_groups: List[int] = prepare_test_groups(
+            task_dict["test_groups"], len(task_dict["tests"])
+        )
 
         task_tests_specs = [result.test for result in attempt.results]
         task_tests_map: Dict[str, TaskTest] = dict()  # spec : TaskTest

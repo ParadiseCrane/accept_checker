@@ -193,3 +193,17 @@ def group_values(values: List, group_division: List[int]) -> List:
         grouped_values.append(values[start_idx_inc : end_idx_exc + 1])
 
     return grouped_values
+
+
+def prepare_test_groups(test_groups: List[int], total_tests: int) -> List[int]:
+    """Prepares test_groups from database for
+    further using in group_values function
+
+    Args:
+        test_groups (list[int]): grouping index slices
+        total_tests (int): total number of tests in the task
+
+    Returns:
+        list[int]: prepared test_groups
+    """
+    return [-1] + test_groups + [total_tests]

@@ -10,10 +10,11 @@ from database import DATABASE
 from settings import SETTINGS_MANAGER
 from typing import List, Any
 
+
 class Listener:
     """Listens to database updates"""
 
-    async def _get_pending_items(self, limit: int = 10)-> List[Any]:
+    async def _get_pending_items(self, limit: int = 10) -> List[Any]:
         collection = DATABASE.get_collection(self._pending_attempts_collection_name)
 
         item_dicts: Any = []
