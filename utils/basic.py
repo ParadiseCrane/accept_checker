@@ -1,6 +1,6 @@
 """General utilities functions"""
 
-from typing import Literal, Union, List
+from typing import Dict, Literal, Union, List
 from datetime import datetime, timezone
 import shutil
 import sys
@@ -15,10 +15,6 @@ from settings import SETTINGS_MANAGER
 from utils.soft_mkdir import soft_mkdir
 
 
-VERDICT_DICT = dict(
-    {"OK": 0, "TL": 1, "WA": 2, "CE": 3, "RE": 4, "SE": 5, "NT": 6, "ML": 7, "CH": 8}
-)
-
 VerdictType = Union[
     Literal["OK"],
     Literal["TL"],
@@ -30,6 +26,11 @@ VerdictType = Union[
     Literal["ML"],
     Literal["CH"],
 ]
+
+VERDICT_DICT: Dict[VerdictType, int] = dict(
+    {"OK": 0, "TL": 1, "WA": 2, "CE": 3, "RE": 4, "SE": 5, "NT": 6, "ML": 7, "CH": 8}
+)
+
 
 ATTEMPT_STATUS_DICT = dict(
     {
@@ -166,3 +167,29 @@ def generate_program_name(attempt: Attempt) -> str:
         str: program name
     """
     return attempt.spec[:16]
+
+
+def group_values(values: List, group_division: List[int]) -> List:
+    """Groups values based on slice indexes
+
+    Args:
+        values (list): data to group
+        group_division (list[int]): grouping index slices
+
+    Returns:
+        list: grouped values
+    """
+
+    grouped_values = []
+
+    values_len = len(values)
+    for i in range(1, len(group_division)):
+        start_idx_inc = group_division[i - 1] + 1
+        end_idx_exc = group_division[i]
+
+        if start_idx_inc > values_len:
+            break
+
+        grouped_values.append(values[start_idx_inc : end_idx_exc + 1])
+
+    return grouped_values

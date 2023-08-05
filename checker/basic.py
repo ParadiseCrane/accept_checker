@@ -199,7 +199,7 @@ class CodeChecker(Checker):
         Returns:
             list[int]: verdicts
         """
-        verdicts = generate_tests_verdicts("NT", len(attempt.results))
+        verdicts = generate_tests_verdicts("NT", len(task_tests))
 
         with pool.ThreadPoolExecutor(max_workers=5) as executor:
             processes = [
@@ -207,7 +207,7 @@ class CodeChecker(Checker):
                     language_class.get_cmd_run(folder_path, program_name),
                     language_class.get_memory_usage,
                 )
-                for _ in range(len(attempt.results))
+                for _ in range(len(task_tests))
             ]
 
             pool_processes: List[Any] = []
