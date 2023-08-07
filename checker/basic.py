@@ -1,10 +1,10 @@
 """Contains Checker abstract class"""
 
-from itertools import zip_longest
-import os
 import concurrent.futures as pool
-from typing import Optional, List, Tuple, Any
-from program_languages.basic import ProgramLanguage
+import os
+from itertools import zip_longest
+from typing import Any, List, Optional, Tuple
+
 from custom_exceptions import (
     CompilationErrorException,
     MemoryLimitException,
@@ -14,6 +14,7 @@ from custom_exceptions import (
 )
 from custom_process import CustomProcess
 from models import Attempt, Language, TaskTest
+from program_languages.basic import ProgramLanguage
 from utils.basic import VerdictType, generate_tests_verdicts, map_verdict
 
 
@@ -199,7 +200,7 @@ class CodeChecker(Checker):
         Returns:
             list[int]: verdicts
         """
-        verdicts = generate_tests_verdicts("NT", len(attempt.results))
+        verdicts = generate_tests_verdicts("NT", len(task_tests))
 
         with pool.ThreadPoolExecutor(max_workers=5) as executor:
             processes = [
@@ -207,7 +208,7 @@ class CodeChecker(Checker):
                     language_class.get_cmd_run(folder_path, program_name),
                     language_class.get_memory_usage,
                 )
-                for _ in range(len(attempt.results))
+                for _ in range(len(task_tests))
             ]
 
             pool_processes: List[Any] = []

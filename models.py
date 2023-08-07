@@ -1,5 +1,5 @@
 """Contains data models"""
-from typing import List, Any, Dict
+from typing import Any, Dict, List
 
 
 class PendingQueueItem:
@@ -93,6 +93,8 @@ class Attempt:
 
     def __init__(self, attempt_dict: Dict[str, Any]):
         self.spec: str = attempt_dict["spec"]
+        self.origin: str = attempt_dict["origin"]
+        self.author: str = attempt_dict["author"]
         self.language: str = attempt_dict["language"]
         self.status: int = attempt_dict["status"]
         self.constraints = self.Constraints(attempt_dict["constraints"])
@@ -101,6 +103,7 @@ class Attempt:
         self.date: str = attempt_dict["date"]
         self.results = [self.Result(result) for result in attempt_dict["results"]]
         self.verdict: int = attempt_dict["verdict"]
+        self.verdict_test: int = 0
         self.logs: List[str] = attempt_dict["logs"]
 
     def to_dict(self):
@@ -111,6 +114,8 @@ class Attempt:
         """
         return {
             "spec": self.spec,
+            "origin": self.origin,
+            "author": self.author,
             "language": self.language,
             "status": self.status,
             "constraints": self.constraints.to_dict(),
@@ -119,6 +124,7 @@ class Attempt:
             "date": self.date,
             "results": self.results,
             "verdict": self.verdict,
+            "verdictTest": self.verdict_test,
             "logs": self.logs,
         }
 

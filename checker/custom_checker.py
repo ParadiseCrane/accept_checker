@@ -1,17 +1,18 @@
 """Contains Custom checker class"""
 
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
+
 from checker.basic import CodeChecker
+from custom_exceptions import CompilationErrorException
 from custom_process import CustomProcess
-from program_languages.utils import get_language_class
 from models import Attempt, Language, PendingQueueItem, TaskTest
+from program_languages.utils import get_language_class
 from utils.basic import (
     VerdictType,
     generate_program_name,
     generate_tests_verdicts,
     map_verdict,
 )
-from custom_exceptions import CompilationErrorException
 
 
 class CustomChecker(CodeChecker):
@@ -55,16 +56,32 @@ class CustomChecker(CodeChecker):
         self,
         checker: PendingQueueItem.Checker,
         attempt: Attempt,
-        task_tests: List[TaskTest],
+        grouped_tests: List[List[TaskTest]],
         folder_path: str,
         program_language: Language,
         checker_language: Language,
     ) -> Tuple[List[int], List[str]]:
+        """Starts checker
+
+        Args:
+            checker (PendingQueueItem.Checker): program checker
+            attempt (Attempt): user attempt
+            grouped_tests (List[List[TaskTest]]): grouped task tests
+            folder_path (str): path to the testing folder
+            program_language (Language): Language model
+            checker_language (Language): checker Language model
+
+        Returns:
+            tuple[list[int], list[str]]: (verdicts, logs)
+        """
+
+        tests_number = sum(map(len, grouped_tests))
+
         try:
             program_language_class = get_language_class(program_language.short_name)
         except BaseException as exc:  # pylint: disable=W0718
             return (
-                generate_tests_verdicts("SE", len(task_tests)),
+                generate_tests_verdicts("SE", tests_number),
                 [
                     f"Attempt {attempt.spec}",
                     f"No language with short name '{program_language.short_name}'",
@@ -75,7 +92,7 @@ class CustomChecker(CodeChecker):
             checker_language_class = get_language_class(checker_language.short_name)
         except BaseException as exc:  # pylint: disable=W0718
             return (
-                generate_tests_verdicts("SE", len(task_tests)),
+                generate_tests_verdicts("SE", tests_number),
                 [
                     f"Attempt {attempt.spec}",
                     f"No language with short name '{checker_language.short_name}'",
@@ -91,7 +108,7 @@ class CustomChecker(CodeChecker):
             )
         except BaseException as exc:  # pylint: disable=W0718
             return (
-                generate_tests_verdicts("SE", len(task_tests)),
+                generate_tests_verdicts("SE", tests_number),
                 [f"Attempt {attempt.spec}", str(exc)],
             )
 
@@ -103,10 +120,10 @@ class CustomChecker(CodeChecker):
                 checker_language.compile_offset,
             )
         except CompilationErrorException:
-            return (generate_tests_verdicts("CH", len(task_tests)), [])
+            return (generate_tests_verdicts("CH", tests_number), [])
         except BaseException as exc:  # pylint: disable=W0718
             return (
-                generate_tests_verdicts("SE", len(task_tests)),
+                generate_tests_verdicts("SE", tests_number),
                 [f"Attempt {attempt.spec}", str(exc)],
             )
 
@@ -123,7 +140,7 @@ class CustomChecker(CodeChecker):
             )
         except BaseException as exc:  # pylint: disable=W0718
             return (
-                generate_tests_verdicts("SE", len(task_tests)),
+                generate_tests_verdicts("SE", tests_number),
                 [f"Attempt {attempt.spec}", str(exc)],
             )
 
@@ -135,20 +152,37 @@ class CustomChecker(CodeChecker):
                 program_language.compile_offset,
             )
         except CompilationErrorException:
-            return (generate_tests_verdicts("CE", len(task_tests)), [])
+            return (generate_tests_verdicts("CE", tests_number), [])
         except BaseException as exc:  # pylint: disable=W0718
             return (
-                generate_tests_verdicts("SE", len(task_tests)),
+                generate_tests_verdicts("SE", tests_number),
                 [f"Attempt {attempt.spec}", str(exc)],
             )
 
-        verdicts = self.run_tests(
-            folder_path,
-            program_name,
-            attempt,
-            task_tests,
-            program_language,
-            program_language_class,
-        )
+        ok_verdict_spec = map_verdict("OK")
+
+        verdicts = []
+        all_correct = True
+        for tests_group in grouped_tests:
+            if not all_correct:
+                verdicts += generate_tests_verdicts("NT", len(tests_group))
+                continue
+
+            group_verdicts = self.run_tests(
+                folder_path,
+                program_name,
+                attempt,
+                tests_group,
+                program_language,
+                program_language_class,
+            )
+
+            if all_correct:
+                for verdict in group_verdicts:
+                    if verdict != ok_verdict_spec:
+                        all_correct = False
+                        break
+
+            verdicts += group_verdicts
 
         return verdicts, []

@@ -1,22 +1,25 @@
 """Contains Manager for running the checker class"""
 
-import sys
 import asyncio
-from math import floor
 import os
-from typing import Dict, List, Optional, Tuple, Any, Callable, Coroutine
-from settings import SETTINGS_MANAGER
+import sys
+from math import floor
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple
+
 from checker.custom_checker import CustomChecker
 from checker.tests import TestsChecker
 from checker.text import TextChecker
-from models import Attempt, Language, PendingQueueItem, TaskTest
 from database import DATABASE
+from models import Attempt, Language, PendingQueueItem, TaskTest
+from settings import SETTINGS_MANAGER
 from utils.basic import (
+    create_program_folder,
     delete_folder,
     generate_tests_verdicts,
-    create_program_folder,
+    group_values,
     map_attempt_status,
     map_verdict,
+    prepare_test_groups,
     send_alert,
 )
 
@@ -93,25 +96,32 @@ class Manager:
 
         return is_testing_set
 
-    async def _save_attempt_results(
+    async def _get_attempt_final_info(
         self,
-        attempt_spec: str,
         results: List[Attempt.Result],
         verdicts: List[int],
-        logs: List[str],
-    ):
+    ) -> Tuple[int, int]:
         for idx, result in enumerate(results):
             results[idx].verdict = verdicts[idx]
 
-        attempt_final_verdict = 0
+        attempt_final_verdict = map_verdict("NT")
         attempt_final_verdict_test = 0
 
         for result in results:
             attempt_final_verdict_test += 1
+            attempt_final_verdict = result.verdict
             if result.verdict != 0:
-                attempt_final_verdict = result.verdict
                 break
+        return attempt_final_verdict, attempt_final_verdict_test
 
+    async def _save_attempt_results(
+        self,
+        attempt_spec: str,
+        results: List[Attempt.Result],
+        attempt_final_verdict: int,
+        attempt_final_verdict_test: int,
+        logs: List[str],
+    ):
         results_dict = [result.to_dict() for result in results]
         await DATABASE.update_one(
             "attempt",
@@ -120,13 +130,12 @@ class Manager:
                 "$set": {
                     "status": map_attempt_status("finished"),
                     "verdict": attempt_final_verdict,
+                    "verdictTest": attempt_final_verdict_test,
                     "results": results_dict,
                     "logs": logs,
                 }
             },
         )
-
-        return attempt_final_verdict, attempt_final_verdict_test
 
     async def _save_task_results(
         self,
@@ -214,19 +223,21 @@ class Manager:
         verdicts: List[int],
         logs: List[str],
     ):
-        _, attempt_final_info = await asyncio.gather(
-            *[
-                DATABASE.delete_one("pending_task_attempt", {"attempt": attempt.spec}),
-                self._save_attempt_results(
-                    attempt.spec, attempt.results, verdicts, logs
-                ),
-            ]
-        )
-
-        attempt_final_verdict, attempt_final_verdict_test = attempt_final_info
+        (
+            attempt_final_verdict,
+            attempt_final_verdict_test,
+        ) = await self._get_attempt_final_info(attempt.results, verdicts)
 
         await asyncio.gather(
             *[
+                DATABASE.delete_one("pending_task_attempt", {"attempt": attempt.spec}),
+                self._save_attempt_results(
+                    attempt.spec,
+                    attempt.results,
+                    attempt_final_verdict,
+                    attempt_final_verdict_test,
+                    logs,
+                ),
                 self._save_task_results(
                     attempt,
                     author_login,
@@ -262,12 +273,15 @@ class Manager:
         author_login: str,
         task_spec: str,
         task_tests: List[TaskTest],
+        test_groups: List[int],
         queue_item: PendingQueueItem,
     ):
         check_type = queue_item.task_check_type
 
+        grouped_tests: List[List[TaskTest]] = group_values(task_tests, test_groups)
+
         await self._task_check_type_handler[check_type](
-            attempt, author_login, task_spec, task_tests, queue_item
+            attempt, author_login, task_spec, grouped_tests, queue_item
         )
 
     @_soft_run
@@ -277,6 +291,7 @@ class Manager:
         author_login: str,
         task_spec: str,
         task_tests: List[TaskTest],
+        test_groups: List[int],
         _queue_item: PendingQueueItem,
     ):
         is_set_testing = await self._set_testing(attempt, author_login, task_spec)
@@ -288,7 +303,9 @@ class Manager:
         correct_answers: List[str] = [task_test.output_data for task_test in task_tests]
 
         text_checker = self.text_checker_class()
-        verdicts, logs = await text_checker.start(user_answers, correct_answers)
+        verdicts, logs = await text_checker.start(
+            user_answers, correct_answers, test_groups
+        )
         await self._save_results(attempt, author_login, task_spec, verdicts, logs)
 
     @_soft_run
@@ -297,7 +314,7 @@ class Manager:
         attempt: Attempt,
         author_login: str,
         task_spec: str,
-        task_tests: List[TaskTest],
+        grouped_tests: List[List[TaskTest]],
         _queue_item: PendingQueueItem,
     ):
         is_set = await self._set_testing(attempt, author_login, task_spec)
@@ -313,7 +330,7 @@ class Manager:
 
         verdicts, logs = await tests_checker.start(
             attempt,
-            task_tests,
+            grouped_tests,
             folder_path,
             language,
         )
@@ -328,7 +345,7 @@ class Manager:
         attempt: Attempt,
         author_login: str,
         task_spec: str,
-        task_tests: List[TaskTest],
+        grouped_tests: List[List[TaskTest]],
         queue_item: PendingQueueItem,
     ):
         is_set = await self._set_testing(attempt, author_login, task_spec)
@@ -361,7 +378,7 @@ class Manager:
         verdicts, logs = await custom_checker_.start(
             queue_item.checker,
             attempt,
-            task_tests,
+            grouped_tests,
             folder_path,
             program_language,
             checker_language,
@@ -398,7 +415,7 @@ class Manager:
             task_spec (str): task spec
         """
 
-        attempt_dict, queue_item_dict = await asyncio.gather(
+        attempt_dict, queue_item_dict, task_dict = await asyncio.gather(
             *[
                 DATABASE.find_one("attempt", {"spec": attempt_spec}),
                 DATABASE.find_one(
@@ -406,11 +423,20 @@ class Manager:
                     {"attempt": attempt_spec},
                     {"taskType": 1, "taskCheckType": 1, "checker": 1},
                 ),
+                DATABASE.find_one(
+                    "task",
+                    {"spec": task_spec},
+                    {"test_groups": 1, "tests": 1},
+                ),
             ]
         )
 
         queue_item = PendingQueueItem(queue_item_dict)
         attempt = Attempt(attempt_dict)
+
+        test_groups: List[int] = prepare_test_groups(
+            task_dict["test_groups"], len(task_dict["tests"])
+        )
 
         task_tests_specs = [result.test for result in attempt.results]
         task_tests_map: Dict[str, TaskTest] = dict()  # spec : TaskTest
@@ -430,6 +456,7 @@ class Manager:
             author_login,
             task_spec,
             task_tests,
+            test_groups,
             queue_item,
         )
 

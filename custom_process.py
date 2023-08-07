@@ -1,10 +1,12 @@
 """Contains Custom Process class"""
 
-from time import sleep
-import subprocess
 import concurrent.futures as pool
-from typing import List, Callable, Any
+import subprocess
+from time import sleep
+from typing import Any, Callable, List
+
 import psutil
+
 from custom_exceptions import (
     MemoryLimitException,
     RuntimeErrorException,
@@ -12,7 +14,6 @@ from custom_exceptions import (
 )
 from settings import SETTINGS_MANAGER
 from utils.basic import kill_process_tree
-
 
 DEFAULT_MEM_LIMIT_BYTES = int(SETTINGS_MANAGER.limits.memory_mb) << 20  # MB to bytes
 DEFAULT_TIME_LIMIT_SECONDS = SETTINGS_MANAGER.limits.time_seconds
@@ -27,9 +28,7 @@ class CustomProcess:
 
         self.sleep_time = 0.05
 
-    def _check_info(
-        self, process: psutil.Popen, time_limit: float, memory_limit: float
-    ):
+    def _check_info(self, process: psutil.Popen, time_limit: float, memory_limit: float):
         total_sleep = 0
         try:
             while process.is_running():
