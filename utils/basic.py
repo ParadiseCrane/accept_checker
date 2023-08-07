@@ -247,4 +247,4 @@ def prepare_test_groups(
     Returns:
         list[int]: prepared test_groups
     """
-    return [-1] + test_groups + [total_tests]
+    return [-1] + test_groups + [total_tests - 1]
