@@ -1,8 +1,9 @@
 """Contains MongoDB database class instances"""
 
-from typing import Dict, Optional, Any, List
-import motor.motor_asyncio
 import asyncio
+from typing import Any, Dict, List, Optional
+
+import motor.motor_asyncio
 
 from local_secrets import SECRETS_MANAGER
 
@@ -106,18 +107,18 @@ class Database:
     async def find(
         self,
         collection_name: str,
-        match_dict: Dict[str, Any] = {},
+        match_dict: Optional[Dict[str, Any]] = None,
         filter_dict: Optional[Dict[str, Any]] = None,
     ) -> List[Any]:
         """Returns elements from collection
 
         Args:
             collection_name (str): collection name
-            match_dict (dict): match dictionary
-            filter_dict (dict): filter dictionary
+            match_dict (Optional[Dict[str, Any]], optional): match dictionary. Defaults to None.
+            filter_dict (Optional[Dict[str, Any]], optional): filter dictionary. Defaults to None.
 
         Returns:
-            list[dict]: result
+            List[Any]: result
         """
 
         collection = self.get_collection(collection_name)
