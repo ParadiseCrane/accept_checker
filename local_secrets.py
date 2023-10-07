@@ -13,6 +13,7 @@ class SecretsManager:
         self._path = path
         self._secrets: Dict[str, Any] = dotenv.dotenv_values(self._path)
         self._mongodb_connection_string: str = self._secrets["CONNECTION_STRING"]  # type: ignore
+        self._mongodb_database_name: str = self._secrets["DATABASE_NAME"]  # type: ignore
 
     def get_connection_string(self) -> str:
         """Returns MongoDB connection string
@@ -21,6 +22,14 @@ class SecretsManager:
             str: MongoDB connection string
         """
         return self._mongodb_connection_string
+
+    def get_database_name(self) -> str:
+        """Returns MongoDB database name
+
+        Returns:
+            str: MongoDB database name
+        """
+        return self._mongodb_database_name
 
 
 SECRETS_MANAGER = SecretsManager()
