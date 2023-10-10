@@ -112,6 +112,8 @@ class Manager:
             if result.verdict != 0:
                 break
             attempt_final_verdict_test += 1
+        else:
+            attempt_final_verdict_test -= 1
         return attempt_final_verdict, attempt_final_verdict_test
 
     async def _save_attempt_results(
