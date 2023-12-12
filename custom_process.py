@@ -1,6 +1,7 @@
 """Contains Custom Process class"""
 
 import concurrent.futures as pool
+import resource  # pylint: disable=E0401
 import subprocess
 from time import sleep
 from typing import Any, Callable, List
@@ -21,6 +22,9 @@ DEFAULT_TIME_LIMIT_SECONDS = SETTINGS_MANAGER.limits.time_seconds
 
 class CustomProcess:
     """Custom Process class"""
+
+    def _pre_exec(self):
+        resource.setrlimit(resource.RLIMIT_NPROC, (5, 5))  # type: ignore
 
     def __init__(self, cmd: List[str], get_memory_usage: Callable[[Any], float]):
         self.cmd = cmd
@@ -76,6 +80,7 @@ class CustomProcess:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             encoding="utf8",
+            preexec=self._pre_exec,
         )
 
         with pool.ThreadPoolExecutor() as executor:
