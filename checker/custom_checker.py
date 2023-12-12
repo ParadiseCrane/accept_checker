@@ -130,6 +130,7 @@ class CustomChecker(CodeChecker):
         self.checker_process = CustomProcess(
             checker_language_class.get_cmd_run(folder_path, checker_name),
             checker_language_class.get_memory_usage,
+            compilation=False
         )
 
         program_name = generate_program_name(attempt)

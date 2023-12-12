@@ -26,9 +26,10 @@ class CustomProcess:
     def _pre_exec(self):
         resource.setrlimit(resource.RLIMIT_NPROC, (5, 5))  # type: ignore
 
-    def __init__(self, cmd: List[str], get_memory_usage: Callable[[Any], float]):
+    def __init__(self, cmd: List[str], get_memory_usage: Callable[[Any], float], compilation: bool):
         self.cmd = cmd
         self.get_memory_usage = get_memory_usage
+        self.compilation = compilation
 
         self.sleep_time = 0.05
 
@@ -80,7 +81,7 @@ class CustomProcess:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             encoding="utf8",
-            preexec=self._pre_exec,
+            preexec_fn=self._pre_exec if not self.compilation else None,
         )
 
         with pool.ThreadPoolExecutor() as executor:
