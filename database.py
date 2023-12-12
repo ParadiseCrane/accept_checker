@@ -16,7 +16,7 @@ class Database:
             SECRETS_MANAGER.get_connection_string()
         )
         self.client.get_io_loop = asyncio.get_running_loop
-        self.database = self.client.Accept
+        self.database = self.client[SECRETS_MANAGER.get_database_name()]
 
     def __init__(self) -> None:
         self._connect()
