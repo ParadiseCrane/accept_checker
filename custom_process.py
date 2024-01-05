@@ -26,14 +26,21 @@ class CustomProcess:
     def _pre_exec(self):
         resource.setrlimit(resource.RLIMIT_NPROC, (5, 5))  # type: ignore
 
-    def __init__(self, cmd: List[str], get_memory_usage: Callable[[Any], float], compilation: bool):
+    def __init__(
+        self,
+        cmd: List[str],
+        get_memory_usage: Callable[[Any], float],
+        compilation: bool,
+    ):
         self.cmd = cmd
         self.get_memory_usage = get_memory_usage
         self.compilation = compilation
 
         self.sleep_time = 0.05
 
-    def _check_info(self, process: psutil.Popen, time_limit: float, memory_limit: float):
+    def _check_info(
+        self, process: psutil.Popen, time_limit: float, memory_limit: float
+    ):
         total_sleep = 0
         try:
             while process.is_running():

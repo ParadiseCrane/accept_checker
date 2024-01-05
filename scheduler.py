@@ -2,10 +2,8 @@
 
 from typing import Optional
 
-import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 
 from date import DATE_TIME_INFO
 from settings import SETTINGS_MANAGER

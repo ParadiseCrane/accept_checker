@@ -105,7 +105,7 @@ class CodeChecker(Checker):
         process = CustomProcess(
             language_class.get_cmd_compile(folder_path, program_name),
             language_class.get_memory_usage,
-            compilation=True
+            compilation=True,
         )
 
         try:
@@ -208,7 +208,7 @@ class CodeChecker(Checker):
                 CustomProcess(
                     language_class.get_cmd_run(folder_path, program_name),
                     language_class.get_memory_usage,
-                    compilation=False
+                    compilation=False,
                 )
                 for _ in range(len(task_tests))
             ]

@@ -63,7 +63,9 @@ class Tuner:
             pass
         return cpu_time_usage + self.test_sleep_seconds
 
-    def _mem_test(self, process: psutil.Popen, language_class: ProgramLanguage) -> float:
+    def _mem_test(
+        self, process: psutil.Popen, language_class: ProgramLanguage
+    ) -> float:
         memory_usage = 0
         total_sleep = 0
 
