@@ -11,7 +11,7 @@ from typing import Any, Callable, List, Tuple
 
 import psutil
 
-from database import DATABASE
+from database import Database
 from date import DATE_TIME_INFO
 from models import Language
 from program_languages.basic import ProgramLanguage
@@ -154,16 +154,8 @@ class Tuner:
 
         return compile_offset_seconds, run_offset_seconds, run_memory_offset_bytes
 
-    def __init__(self):
-        self.test_sleep_seconds = 0.001
-        self.mem_time_limit_seconds = 3
-        self.test_runs_count = SETTINGS_MANAGER.tuner.test_runs_count
-        self.folder_path = os.path.join(".", SETTINGS_MANAGER.tuner.tests_folder)
-        soft_mkdir(self.folder_path)
-
-    async def start(self):
-        """Starts tuner"""
-        language_dicts = await DATABASE.find("language")
+    async def _start(self, db: Database):
+        language_dicts = await db.find("language")
 
         languages = [Language(language_dict) for language_dict in language_dicts]
 
@@ -175,7 +167,7 @@ class Tuner:
                     memory_offset_bytes,
                 ) = self._tune_language(language)
 
-                await DATABASE.update_one(
+                await db.update_one(
                     "language",
                     {"spec": language.spec},
                     {
@@ -194,6 +186,19 @@ class Tuner:
                     "Tuner failure", f"language {language.short_name}\n{str(exc)}"
                 )
                 continue
+
+    def __init__(self):
+        self.test_sleep_seconds = 0.001
+        self.mem_time_limit_seconds = 3
+        self.test_runs_count = SETTINGS_MANAGER.tuner.test_runs_count
+        self.folder_path = os.path.join(".", SETTINGS_MANAGER.tuner.tests_folder)
+        soft_mkdir(self.folder_path)
+
+    async def start(self):
+        """Starts tuner"""
+
+        for organization in SETTINGS_MANAGER.organizations:
+            await self._start(Database(organization))
 
 
 if __name__ == "__main__":

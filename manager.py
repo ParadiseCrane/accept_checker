@@ -9,7 +9,7 @@ from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple
 from checker.custom_checker import CustomChecker
 from checker.tests import TestsChecker
 from checker.text import TextChecker
-from database import DATABASE
+from database import Database
 from models import Attempt, Language, PendingQueueItem, TaskTest
 from settings import SETTINGS_MANAGER
 from utils.basic import (
@@ -72,10 +72,10 @@ class Manager:
         status = map_attempt_status("testing")
         attempt_result, _ = await asyncio.gather(
             *[
-                DATABASE.update_one(
+                self._db.update_one(
                     "attempt", {"spec": attempt.spec}, {"$set": {"status": status}}
                 ),
-                DATABASE.update_one(
+                self._db.update_one(
                     "user_task_status",
                     {"attempt": attempt.spec},
                     {"$set": {"status": status}},
@@ -125,7 +125,7 @@ class Manager:
         logs: List[str],
     ):
         results_dict = [result.to_dict() for result in results]
-        await DATABASE.update_one(
+        await self._db.update_one(
             "attempt",
             {"spec": attempt_spec},
             {
@@ -163,7 +163,7 @@ class Manager:
             "verdictTest": attempt_final_verdict_test,
         }
 
-        user_task_result_collection = DATABASE.get_collection("user_task_result")
+        user_task_result_collection = self._db.get_collection("user_task_result")
 
         user_task_result_dict = await user_task_result_collection.find_one(
             {"task": task_spec, "user": author_login}
@@ -190,7 +190,7 @@ class Manager:
             "verdict"
         ] == 0:
             database_actions.append(
-                DATABASE.update_one(
+                self._db.update_one(
                     "rating", {"user": author_login}, {"$inc": {"score": 1}}, True
                 )
             )
@@ -232,7 +232,7 @@ class Manager:
 
         await asyncio.gather(
             *[
-                DATABASE.delete_one("pending_task_attempt", {"attempt": attempt.spec}),
+                self._db.delete_one("pending_task_attempt", {"attempt": attempt.spec}),
                 self._save_attempt_results(
                     attempt.spec,
                     attempt.results,
@@ -248,7 +248,7 @@ class Manager:
                     attempt_final_verdict,
                     attempt_final_verdict_test,
                 ),
-                DATABASE.update_one(
+                self._db.update_one(
                     "user_task_status",
                     {"attempt": attempt.spec},
                     {"$set": {"status": map_attempt_status("finished")}},
@@ -323,7 +323,7 @@ class Manager:
         if not is_set:
             return
 
-        language_dict = await DATABASE.find_one("language", {"spec": attempt.language})
+        language_dict = await self._db.find_one("language", {"spec": attempt.language})
         language = Language(language_dict)
 
         folder_path = create_program_folder(attempt.spec)
@@ -366,8 +366,8 @@ class Manager:
 
         program_language_dict, checker_language_dict = await asyncio.gather(
             *[
-                DATABASE.find_one("language", {"spec": attempt.language}),
-                DATABASE.find_one("language", {"spec": queue_item.checker.language}),
+                self._db.find_one("language", {"spec": attempt.language}),
+                self._db.find_one("language", {"spec": queue_item.checker.language}),
             ]
         )
         program_language = Language(program_language_dict)
@@ -390,7 +390,9 @@ class Manager:
 
         await self._save_results(attempt, author_login, task_spec, verdicts, logs)
 
-    def __init__(self) -> None:
+    def __init__(self, organization: str) -> None:
+        self._db = Database(organization)  # org
+
         self._current_dir = os.path.dirname(os.path.abspath(__file__))
         self._task_type_handler = {
             0: self._handle_code_task,
@@ -408,24 +410,30 @@ class Manager:
 
         self.settings = SETTINGS_MANAGER.manager
 
-    async def start(self, attempt_spec: str, author_login: str, task_spec: str):
+    async def start(
+        self,
+        attempt_spec: str,
+        author_login: str,
+        task_spec: str,
+    ):
         """Starts Manager for given pending item
 
         Args:
             attempt_spec (str): attempt spec
             author_login (str): author login
             task_spec (str): task spec
+            organization_spec (str): organization spec
         """
 
         attempt_dict, queue_item_dict, task_dict = await asyncio.gather(
             *[
-                DATABASE.find_one("attempt", {"spec": attempt_spec}),
-                DATABASE.find_one(
+                self._db.find_one("attempt", {"spec": attempt_spec}),
+                self._db.find_one(
                     "pending_task_attempt",
                     {"attempt": attempt_spec},
                     {"taskType": 1, "taskCheckType": 1, "checker": 1},
                 ),
-                DATABASE.find_one(
+                self._db.find_one(
                     "task",
                     {"spec": task_spec},
                     {"test_groups": 1, "tests": 1},
@@ -442,7 +450,7 @@ class Manager:
 
         task_tests_specs = [result.test for result in attempt.results]
         task_tests_map: Dict[str, TaskTest] = dict()  # spec : TaskTest
-        for task_test_dict in await DATABASE.find(
+        for task_test_dict in await self._db.find(
             "task_test", {"spec": {"$in": task_tests_specs}}
         ):
             task_tests_map[task_test_dict["spec"]] = TaskTest(task_test_dict)
@@ -463,9 +471,17 @@ class Manager:
         )
 
 
-MANAGER = Manager()
-
 if __name__ == "__main__":
-    *_, attempt_spec_arg, author_login_arg, task_spec_arg = sys.argv
+    (
+        *_,
+        attempt_spec_arg,
+        author_login_arg,
+        task_spec_arg,
+        organization_spec_arg,
+    ) = sys.argv
 
-    asyncio.run(MANAGER.start(attempt_spec_arg, author_login_arg, task_spec_arg))
+    asyncio.run(
+        Manager(organization_spec_arg).start(
+            attempt_spec_arg, author_login_arg, task_spec_arg
+        )
+    )

@@ -24,6 +24,7 @@ class SecretsManager:
         return self._mongodb_connection_string
 
     def get_database_name(self) -> str:
+        #! Deprecated
         """Returns MongoDB database name
 
         Returns:

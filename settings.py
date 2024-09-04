@@ -166,5 +166,9 @@ class SettingsManager:
         self._pack_tuner()
         self._pack_limits()
 
+    @property
+    def organizations(self) -> list[str]:
+        return self._settings["organizations"]
+
 
 SETTINGS_MANAGER = SettingsManager()

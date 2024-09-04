@@ -7,7 +7,7 @@ import subprocess
 import sys
 from typing import Any, List
 
-from database import DATABASE
+from database import Database
 from settings import SETTINGS_MANAGER
 
 
@@ -15,12 +15,12 @@ class Listener:
     """Listens to database updates"""
 
     async def _get_pending_items(self, limit: int = 10) -> List[Any]:
-        collection = DATABASE.get_collection(self._pending_attempts_collection_name)
+        collection = self._db.get_collection(self._pending_attempts_collection_name)
 
         item_dicts: Any = []
         async for queue_item in collection.aggregate(
             [
-                {"$match": {"examined": None}},
+                {"$match": self._pending_match_dict},
                 {"$limit": limit},
                 {"$project": {"author": 1, "task": 1, "attempt": 1}},
             ]
@@ -35,6 +35,16 @@ class Listener:
         return item_dicts
 
     def __init__(self, manager_path: str = os.path.join(".", "manager.py")) -> None:
+        self._db = Database(Database.settings_db_name)
+
+        watched_organizations = SETTINGS_MANAGER.organizations
+        self._pending_match_dict: dict = (
+            {}
+            if len(watched_organizations) == 0
+            else {"organization": {"$in": watched_organizations}}
+        )
+        self._pending_match_dict.update({"examined": None})
+
         self._manager_path = manager_path
         self._current_dir = os.path.dirname(os.path.abspath(__file__))
         self._pending_attempts_collection_name = "pending_task_attempt"
@@ -47,7 +57,11 @@ class Listener:
         )
 
     def submit_to_manager(
-        self, attempt_spec: str, author_login: str, task_spec: str
+        self,
+        attempt_spec: str,
+        author_login: str,
+        task_spec: str,
+        organization_spec: str,
     ) -> None:
         """Submits attempt to Manager in separate process
 
@@ -55,11 +69,19 @@ class Listener:
             attempt_spec (str): spec of attempt
             author_login (str): login of author
             task_spec (str): spec of task
+            organization_spec (str): spec of organization
 
         """
         try:
             subprocess.run(
-                ["python", self._manager_path, attempt_spec, author_login, task_spec],
+                [
+                    "python",
+                    self._manager_path,
+                    attempt_spec,
+                    author_login,
+                    task_spec,
+                    organization_spec,
+                ],
                 check=True,
             )
         except BaseException as exception:  # pylint:disable=W0718
@@ -77,12 +99,14 @@ class Listener:
                             attempt_spec = queue_item["attempt"]
                             author_login = queue_item["author"]
                             task_spec = queue_item["task"]
+                            organization_spec = queue_item["task"]
 
                             executor.submit(
                                 self.submit_to_manager,
                                 attempt_spec,
                                 author_login,
                                 task_spec,
+                                organization_spec,
                             )
 
                     except BaseException as exception:  # pylint:disable=W0718

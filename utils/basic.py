@@ -9,7 +9,7 @@ from typing import Dict, List, Literal, Union
 
 import psutil
 
-from database import DATABASE
+from database import Database
 from models import Attempt
 from settings import SETTINGS_MANAGER
 from utils.soft_mkdir import soft_mkdir
@@ -128,7 +128,7 @@ async def send_alert(
         }
     )
 
-    await DATABASE.insert_one("checker_alert", alert)
+    await Database(Database.settings_db_name).insert_one("checker_alert", alert)
 
 
 def delete_folder(path: str):
