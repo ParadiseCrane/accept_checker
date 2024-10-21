@@ -22,7 +22,7 @@ class Listener:
             [
                 {"$match": self._pending_match_dict},
                 {"$limit": limit},
-                {"$project": {"author": 1, "task": 1, "attempt": 1}},
+                {"$project": {"author": 1, "task": 1, "attempt": 1, "organization": 1}},
             ]
         ):
             item_dicts.append(queue_item)
@@ -84,6 +84,7 @@ class Listener:
                 ],
                 check=True,
             )
+
         except BaseException as exception:  # pylint:disable=W0718
             print("Listener error", f"Error when starting manager: {exception}")
 
@@ -99,7 +100,7 @@ class Listener:
                             attempt_spec = queue_item["attempt"]
                             author_login = queue_item["author"]
                             task_spec = queue_item["task"]
-                            organization_spec = queue_item["task"]
+                            organization_spec = queue_item["organization"]
 
                             executor.submit(
                                 self.submit_to_manager,

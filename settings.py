@@ -1,7 +1,7 @@
 """Contains the SettingsManager class instances"""
 import json
 import os
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from utils.soft_mkdir import soft_mkdir
 
@@ -167,7 +167,7 @@ class SettingsManager:
         self._pack_limits()
 
     @property
-    def organizations(self) -> list[str]:
+    def organizations(self) -> List[str]:
         return self._settings["organizations"]
 
 
