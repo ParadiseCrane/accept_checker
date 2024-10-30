@@ -14,6 +14,12 @@ Tested on **Ubuntu 20.04.3 LTS**
 - python3
 - pypy3
 
+## Kafka Setup
+
+docker run -p port:port apache/kafka:3.8.0
+
+Then add path to kafka to .env
+
 ## Before start
 
-pipenv install
+pipenv install 
