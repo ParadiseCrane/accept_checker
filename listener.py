@@ -5,37 +5,20 @@ import concurrent.futures as pool
 import os
 import subprocess
 import sys
+import json
+from aiokafka import AIOKafkaConsumer
 from typing import Any, List
 
 from database import Database
+from local_secrets import SECRETS_MANAGER
 from settings import SETTINGS_MANAGER
 
 
 class Listener:
     """Listens to database updates"""
-
-    async def _get_pending_items(self, limit: int = 10) -> List[Any]:
-        collection = self._db.get_collection(self._pending_attempts_collection_name)
-
-        item_dicts: Any = []
-        async for queue_item in collection.aggregate(
-            [
-                {"$match": self._pending_match_dict},
-                {"$limit": limit},
-                {"$project": {"author": 1, "task": 1, "attempt": 1}},
-            ]
-        ):
-            item_dicts.append(queue_item)
-
-        await collection.update_many(
-            {"attempt": {"$in": list(map(lambda item: item["attempt"], item_dicts))}},
-            {"$set": {"examined": True}},
-        )
-
-        return item_dicts
-
     def __init__(self, manager_path: str = os.path.join(".", "manager.py")) -> None:
         self._db = Database(Database.settings_db_name)
+        self._kafka_string = SECRETS_MANAGER.get_kafka_string()
 
         watched_organizations = SETTINGS_MANAGER.organizations
         self._pending_match_dict: dict = (
@@ -47,8 +30,7 @@ class Listener:
 
         self._manager_path = manager_path
         self._current_dir = os.path.dirname(os.path.abspath(__file__))
-        self._pending_attempts_collection_name = "pending_task_attempt"
-
+         
         self.settings = SETTINGS_MANAGER.listener
         self.cpu_number = os.cpu_count() or 0
         self.max_workers = max(
@@ -87,35 +69,39 @@ class Listener:
         except BaseException as exception:  # pylint:disable=W0718
             print("Listener error", f"Error when starting manager: {exception}")
 
-    async def start(self):
+    async def start(self): 
         """Starts listener loop"""
+        
+        consumer = AIOKafkaConsumer(
+            "attempt",
+            bootstrap_servers = self._kafka_string
+        )
+        
+        await consumer.start()
 
         try:
-            with pool.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-                while True:
-                    try:
-                        queue_items = await self._get_pending_items()
-                        for queue_item in queue_items:
-                            attempt_spec = queue_item["attempt"]
-                            author_login = queue_item["author"]
-                            task_spec = queue_item["task"]
-                            organization_spec = queue_item["task"]
+            while True:
+                with pool.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+                    async for attempt in consumer:
+                        attempt = attempt.value.decode("utf-8")
+                        attempt = json.loads(attempt)
+                        attempt_spec = attempt["attempt"]
+                        author_login = attempt["author"]
+                        task_spec = attempt["task"]
+                        organization_spec = attempt["organization"]
 
-                            executor.submit(
+                        executor.submit(
                                 self.submit_to_manager,
                                 attempt_spec,
                                 author_login,
                                 task_spec,
                                 organization_spec,
                             )
-
-                    except BaseException as exception:  # pylint:disable=W0718
-                        print(exception)
-
-                    await asyncio.sleep(self.settings.sleep_timeout_seconds)
         except KeyboardInterrupt:
             print("\nExit")
             sys.exit(0)
+        finally:
+            await consumer.stop()
 
 
 LISTENER = Listener()
