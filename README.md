@@ -16,7 +16,7 @@ Tested on **Ubuntu 20.04.3 LTS**
 
 ## Kafka Setup
 
-docker run -p port:port apache/kafka:3.8.0
+sh building.sh
 
 Then add path to kafka to .env
 
