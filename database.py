@@ -11,7 +11,7 @@ from local_secrets import SECRETS_MANAGER
 class Database:
     """Manages database stuff"""
 
-    settings_db_name = "_Settings"
+    settings_db_name = "_settings"
 
     def _connect(self):
         self.client: Any = motor.motor_asyncio.AsyncIOMotorClient(

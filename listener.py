@@ -16,6 +16,7 @@ from settings import SETTINGS_MANAGER
 
 class Listener:
     """Listens to database updates"""
+  
     def __init__(self, manager_path: str = os.path.join(".", "manager.py")) -> None:
         self._db = Database(Database.settings_db_name)
         self._kafka_string = SECRETS_MANAGER.get_kafka_string()
@@ -67,6 +68,7 @@ class Listener:
                 ],
                 check=True,
             )
+
         except BaseException as exception:  # pylint:disable=W0718
             print("Listener error", f"Error when starting manager: {exception}")
 
