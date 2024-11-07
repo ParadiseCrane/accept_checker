@@ -19,6 +19,7 @@ class Listener:
     def __init__(self, manager_path: str = os.path.join(".", "manager.py")) -> None:
         self._db = Database(Database.settings_db_name)
         self._kafka_string = SECRETS_MANAGER.get_kafka_string()
+        self.kafka_debug = SETTINGS_MANAGER.kafka_debug 
 
         watched_organizations = SETTINGS_MANAGER.organizations
         self._pending_match_dict: dict = (
@@ -74,21 +75,27 @@ class Listener:
         
         consumer = AIOKafkaConsumer(
             "attempt",
-            bootstrap_servers = self._kafka_string
+            bootstrap_servers = self._kafka_string,
+            auto_commit_interval_ms=1000,
+            auto_offset_reset="earliest",
+            group_id="kafka_test"
         )
         
         await consumer.start()
-
         try:
             while True:
                 with pool.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
                     async for attempt in consumer:
                         attempt = attempt.value.decode("utf-8")
                         attempt = json.loads(attempt)
+                        
                         attempt_spec = attempt["attempt"]
                         author_login = attempt["author"]
                         task_spec = attempt["task"]
                         organization_spec = attempt["organization"]
+
+                        if self.kafka_debug:
+                            print(f"\nattempt: {attempt_spec}\n\tlogin: {author_login}\n\ttask: {task_spec}\n\torg: {organization_spec}")
 
                         executor.submit(
                                 self.submit_to_manager,
