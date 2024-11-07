@@ -14,6 +14,12 @@ Tested on **Ubuntu 20.04.3 LTS**
 - python3
 - pypy3
 
+## Kafka Setup
+
+sh building.sh
+
+Then add path to kafka to .env
+
 ## Before start
 
-pipenv install
+pipenv install 

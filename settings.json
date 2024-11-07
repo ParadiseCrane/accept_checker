@@ -20,5 +20,8 @@
     "tests_folder": "tuner_tests",
     "test_runs_count": 5
   },
-  "organizations": []
+  "organizations": [],
+  "kafka":{
+    "debug": true 
+  }
 }

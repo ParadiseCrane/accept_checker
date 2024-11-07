@@ -14,6 +14,7 @@ class SecretsManager:
         self._secrets: Dict[str, Any] = dotenv.dotenv_values(self._path)
         self._mongodb_connection_string: str = self._secrets["CONNECTION_STRING"]  # type: ignore
         self._mongodb_database_name: str = self._secrets["DATABASE_NAME"]  # type: ignore
+        self._kafka_connection_string: str = self._secrets["KAFKA_CONNECTION"]
 
     def get_connection_string(self) -> str:
         """Returns MongoDB connection string
@@ -22,6 +23,14 @@ class SecretsManager:
             str: MongoDB connection string
         """
         return self._mongodb_connection_string
+
+    def get_kafka_string(self) -> str:
+        """Returns Kafka port to listen
+
+        Returns:
+            str: Kafka connection string
+        """
+        return self._kafka_connection_string
 
     def get_database_name(self) -> str:
         #! Deprecated
