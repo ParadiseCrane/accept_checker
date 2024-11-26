@@ -5,7 +5,7 @@ from typing import Optional
 from checker.basic import CodeChecker
 from custom_exceptions import CompilationErrorException
 from custom_process import CustomProcess
-from models import Attempt, Language, PendingQueueItem, TaskTest
+from models import Attempt, BasicTaskInfo, Language, TaskTest
 from program_languages.utils import get_language_class
 from utils.basic import (
     VerdictType,
@@ -54,7 +54,7 @@ class CustomChecker(CodeChecker):
 
     async def start(  # pylint:disable=W0221
         self,
-        checker: PendingQueueItem.Checker,
+        checker: BasicTaskInfo.Checker,
         attempt: Attempt,
         grouped_tests: list[list[TaskTest]],
         folder_path: str,
@@ -64,7 +64,7 @@ class CustomChecker(CodeChecker):
         """Starts checker
 
         Args:
-            checker (PendingQueueItem.Checker): program checker
+            checker (BasicTaskInfo.Checker): program checker
             attempt (Attempt): user attempt
             grouped_tests (list[list[TaskTest]]): grouped task tests
             folder_path (str): path to the testing folder

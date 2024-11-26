@@ -22,4 +22,10 @@ Then add path to kafka to .env
 
 ## Before start
 
-pipenv install 
+`uv sync`
+
+## Pylint comments
+
+Code becomes larger, so pylint becomes slower. If it is too slow, then remove it using `uv remove pylint`.
+
+Also remove corresponding line in `setup_precommit.sh` and run it.

@@ -3,11 +3,11 @@
 from typing import Any
 
 
-class PendingQueueItem:
-    """Pending queue item model"""
+class BasicTaskInfo:
+    """Basic task info model"""
 
     class Checker:
-        """PendingQueueItem Checker class"""
+        """BasicTaskInfo Checker class"""
 
         def __init__(self, checker_dict: dict[str, Any]) -> None:
             self.language: int = checker_dict["language"]
@@ -26,7 +26,7 @@ class PendingQueueItem:
 
     def __init__(self, item_dict: dict[str, Any]) -> None:
         self.task_type: int = item_dict["taskType"]
-        self.task_check_type: int = item_dict["taskCheckType"]
+        self.check_type: int = item_dict["checkType"]
         self.checker = None
         if item_dict["checker"] is not None:
             self.checker = self.Checker(item_dict["checker"])
@@ -39,7 +39,7 @@ class PendingQueueItem:
         """
         return {
             "taskType": self.task_type,
-            "taskCheckType": self.task_check_type,
+            "checkType": self.check_type,
             "checker": self.checker.to_dict() if self.checker else None,
         }
 

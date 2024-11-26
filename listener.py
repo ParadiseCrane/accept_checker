@@ -1,9 +1,12 @@
 """Contains Listener for database updates class"""
 
 import concurrent.futures as pool
+import json
 import os
 import subprocess
 import sys
+
+from aiokafka import AIOKafkaConsumer
 
 from local_secrets import SECRETS_MANAGER
 from settings import SETTINGS_MANAGER
@@ -62,35 +65,23 @@ class Listener:
     async def start(self):
         """Starts listener loop"""
 
-        # consumer = AIOKafkaConsumer(
-        #     "attempt",
-        #     bootstrap_servers=self._kafka_string,
-        #     auto_commit_interval_ms=1000,
-        #     auto_offset_reset="earliest",
-        #     group_id="kafka_test",
-        # )
+        consumer = AIOKafkaConsumer(
+            "attempt",
+            bootstrap_servers=self._kafka_string,
+            auto_commit_interval_ms=1000,
+            auto_offset_reset="earliest",
+            group_id="kafka_test",
+        )
 
-        # await consumer.start()
-
-        consumer = [
-            {
-                "organization": "vml",
-                "attempt": "76ab9063-166b-4d76-8984-5d29a93f261b",
-                "author": "AleksOleynik",
-                "task": "431be734-39e6-4f58-aec7-61e67c8ee1b5",
-                "taskType": 0,
-                "taskCheckType": 0,
-                "checker": None,
-            }
-        ]
+        await consumer.start()
 
         try:
             while True:
                 with pool.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-                    # async for attempt in consumer:
-                    #     attempt = attempt.value.decode("utf-8")
-                    #     attempt = json.loads(attempt)
-                    for attempt in consumer:
+                    async for attempt in consumer:
+                        attempt = attempt.value.decode("utf-8")
+                        attempt = json.loads(attempt)
+
                         attempt_spec = attempt["attempt"]
                         author_login = attempt["author"]
                         task_spec = attempt["task"]
@@ -116,8 +107,7 @@ class Listener:
             print("\nExit")
             sys.exit(0)
         finally:
-            # await consumer.stop()
-            pass
+            await consumer.stop()
 
 
 LISTENER = Listener()

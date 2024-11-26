@@ -10,7 +10,7 @@ from checker.custom_checker import CustomChecker
 from checker.tests import TestsChecker
 from checker.text import TextChecker
 from database import Database
-from models import Attempt, Language, PendingQueueItem, TaskTest
+from models import Attempt, BasicTaskInfo, Language, TaskTest
 from settings import SETTINGS_MANAGER
 from utils.basic import (
     create_program_folder,
@@ -232,7 +232,6 @@ class Manager:
 
         await asyncio.gather(
             *[
-                self._db.delete_one("pending_task_attempt", {"attempt": attempt.spec}),
                 self._save_attempt_results(
                     attempt.spec,
                     attempt.results,
@@ -276,14 +275,14 @@ class Manager:
         task_spec: str,
         task_tests: list[TaskTest],
         test_groups: list[int],
-        queue_item: PendingQueueItem,
+        basic_info: BasicTaskInfo,
     ):
-        check_type = queue_item.task_check_type
+        check_type = basic_info.check_type
 
         grouped_tests: list[list[TaskTest]] = group_values(task_tests, test_groups)
 
         await self._task_check_type_handler[check_type](
-            attempt, author_login, task_spec, grouped_tests, queue_item
+            attempt, author_login, task_spec, grouped_tests, basic_info
         )
 
     @_soft_run
@@ -294,7 +293,7 @@ class Manager:
         task_spec: str,
         task_tests: list[TaskTest],
         test_groups: list[int],
-        _queue_item: PendingQueueItem,
+        _basic_info: BasicTaskInfo,
     ):
         is_set_testing = await self._set_testing(attempt, author_login, task_spec)
         if not is_set_testing:
@@ -317,7 +316,7 @@ class Manager:
         author_login: str,
         task_spec: str,
         grouped_tests: list[list[TaskTest]],
-        _queue_item: PendingQueueItem,
+        _basic_info: BasicTaskInfo,
     ):
         is_set = await self._set_testing(attempt, author_login, task_spec)
         if not is_set:
@@ -348,13 +347,13 @@ class Manager:
         author_login: str,
         task_spec: str,
         grouped_tests: list[list[TaskTest]],
-        queue_item: PendingQueueItem,
+        basic_info: BasicTaskInfo,
     ):
         is_set = await self._set_testing(attempt, author_login, task_spec)
         if not is_set:
             return
 
-        if not queue_item.checker:
+        if not basic_info.checker:
             await self._save_results(
                 attempt,
                 author_login,
@@ -367,7 +366,7 @@ class Manager:
         program_language_dict, checker_language_dict = await asyncio.gather(
             *[
                 self._db.find_one("language", {"spec": attempt.language}),
-                self._db.find_one("language", {"spec": queue_item.checker.language}),
+                self._db.find_one("language", {"spec": basic_info.checker.language}),
             ]
         )
         program_language = Language(program_language_dict)
@@ -378,7 +377,7 @@ class Manager:
         custom_checker_ = self.custom_checker_class()
 
         verdicts, logs = await custom_checker_.start(
-            queue_item.checker,
+            basic_info.checker,
             attempt,
             grouped_tests,
             folder_path,
@@ -425,23 +424,24 @@ class Manager:
             organization_spec (str): organization spec
         """
 
-        attempt_dict, queue_item_dict, task_dict = await asyncio.gather(
+        attempt_dict, task_dict = await asyncio.gather(
             *[
                 self._db.find_one("attempt", {"spec": attempt_spec}),
                 self._db.find_one(
-                    "pending_task_attempt",
-                    {"attempt": attempt_spec},
-                    {"taskType": 1, "taskCheckType": 1, "checker": 1},
-                ),
-                self._db.find_one(
                     "task",
                     {"spec": task_spec},
-                    {"test_groups": 1, "tests": 1},
+                    {
+                        "test_groups": 1,
+                        "tests": 1,
+                        "checkType": 1,
+                        "taskType": 1,
+                        "checker": 1,
+                    },
                 ),
             ]
         )
 
-        queue_item = PendingQueueItem(queue_item_dict)
+        basic_task_info = BasicTaskInfo(task_dict)
         attempt = Attempt(attempt_dict)
 
         test_groups: list[int] = prepare_test_groups(
@@ -459,7 +459,7 @@ class Manager:
             task_tests_map[result.test] for result in attempt.results
         ]
 
-        task_type = int(queue_item_dict["taskType"])
+        task_type = int(task_dict["taskType"])
 
         await self._task_type_handler[task_type](
             attempt,
@@ -467,7 +467,7 @@ class Manager:
             task_spec,
             task_tests,
             test_groups,
-            queue_item,
+            basic_task_info,
         )
 
 
