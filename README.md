@@ -24,6 +24,10 @@ Then add path to kafka to .env
 
 `uv sync`
 
+## Start
+
+`uv run main.py`
+
 ## Pylint comments
 
 Code becomes larger, so pylint becomes slower. If it is too slow, then remove it using `uv remove pylint`.
