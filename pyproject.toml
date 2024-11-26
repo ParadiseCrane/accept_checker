@@ -9,7 +9,9 @@ dependencies = [
     "apscheduler>=3.11.0",
     "motor>=3.6.0",
     "psutil>=6.1.0",
+    "pylint>=3.3.1",
     "python-dotenv>=1.0.1",
+    "pytz>=2024.2",
     "ruff>=0.8.0",
 ]
 
@@ -25,6 +27,14 @@ lint.fixable = ["ALL"]
 lint.unfixable = []
 
 exclude = [
+    "__pycache__",
+    ".git",
+    ".ruff_cache",
+    ".venv",
+]
+
+[tool.pylint]
+ignore = [
     "__pycache__",
     ".git",
     ".ruff_cache",
