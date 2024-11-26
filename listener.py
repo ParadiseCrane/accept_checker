@@ -15,11 +15,12 @@ from settings import SETTINGS_MANAGER
 class Listener:
     """Listens to database updates"""
 
-    def __init__(self, manager_path: str = os.path.join(".", "manager.py")) -> None:
-        self._kafka_string = SECRETS_MANAGER.get_kafka_string()
-        self.kafka_debug = SETTINGS_MANAGER.kafka_debug
+    _manager_path = os.path.join(".", "manager.py")
 
-        self._manager_path = manager_path
+    def __init__(self) -> None:
+        self._kafka_string = SECRETS_MANAGER.kafka_string
+        self._debug = SECRETS_MANAGER.debug
+
         self._current_dir = os.path.dirname(os.path.abspath(__file__))
 
         self.settings = SETTINGS_MANAGER.listener
@@ -29,8 +30,8 @@ class Listener:
             int(self.cpu_number * self.settings.cpu_utilization_fraction),
         )
 
+    @staticmethod
     def submit_to_manager(
-        self,
         attempt_spec: str,
         author_login: str,
         task_spec: str,
@@ -49,7 +50,7 @@ class Listener:
             subprocess.run(
                 [
                     "python",
-                    self._manager_path,
+                    Listener._manager_path,
                     attempt_spec,
                     author_login,
                     task_spec,
@@ -73,6 +74,7 @@ class Listener:
         )
 
         await consumer.start()
+
         try:
             while True:
                 with pool.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
@@ -85,18 +87,22 @@ class Listener:
                         task_spec = attempt["task"]
                         organization_spec = attempt["organization"]
 
-                        if self.kafka_debug:
+                        if self._debug:
                             print(
                                 f"\nattempt: {attempt_spec}\n\tlogin: {author_login}\n\ttask: {task_spec}\n\torg: {organization_spec}"
                             )
 
-                        executor.submit(
-                            self.submit_to_manager,
+                        future = executor.submit(
+                            Listener.submit_to_manager,
                             attempt_spec,
                             author_login,
                             task_spec,
                             organization_spec,
                         )
+
+                        if self._debug:
+                            future.add_done_callback(lambda _: print("Finished!"))
+
         except KeyboardInterrupt:
             print("\nExit")
             sys.exit(0)

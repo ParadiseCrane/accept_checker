@@ -147,9 +147,6 @@ class SettingsManager:
             memory_mb=self._settings["default_limits"]["memory_mb"],
         )
 
-    def _pack_kafka(self):
-        self.kafka_debug = self._settings["kafka"]["debug"]
-
     def _load_settings(self):
         with open(self._path, encoding="utf8") as json_file:
             self._settings: dict[str, Any] = json.load(json_file)
@@ -165,7 +162,6 @@ class SettingsManager:
         self._path = path
         self._load_settings()
 
-        self._pack_kafka()
         self._pack_listener()
         self._pack_manager()
         self._pack_tuner()

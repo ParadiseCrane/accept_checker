@@ -15,7 +15,7 @@ class Database:
 
     def _connect(self):
         self.client: Any = motor.motor_asyncio.AsyncIOMotorClient(
-            SECRETS_MANAGER.get_connection_string()
+            SECRETS_MANAGER.connection_string
         )
         self.client.get_io_loop = asyncio.get_running_loop
         self.database = self.client[self._organization]
