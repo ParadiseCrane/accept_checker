@@ -21,7 +21,7 @@
     "test_runs_count": 5
   },
   "organizations": [],
-  "kafka":{
-    "debug": true 
+  "kafka": {
+    "debug": true
   }
 }

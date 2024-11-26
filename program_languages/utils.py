@@ -1,6 +1,5 @@
 """Contains languages aggregator"""
 
-
 from program_languages.basic import ProgramLanguage
 from program_languages.cobol import COBOL_LANGUAGE
 from program_languages.cpp import CPP_LANGUAGE

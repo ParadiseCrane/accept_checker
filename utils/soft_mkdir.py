@@ -1,4 +1,5 @@
 """Contains soft_mkdir function"""
+
 import os
 
 

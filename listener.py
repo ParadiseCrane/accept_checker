@@ -1,38 +1,27 @@
 """Contains Listener for database updates class"""
 
-import asyncio
 import concurrent.futures as pool
+import json
 import os
 import subprocess
 import sys
-import json
-from aiokafka import AIOKafkaConsumer
-from typing import Any, List
 
-from database import Database
+from aiokafka import AIOKafkaConsumer
+
 from local_secrets import SECRETS_MANAGER
 from settings import SETTINGS_MANAGER
 
 
 class Listener:
     """Listens to database updates"""
-  
-    def __init__(self, manager_path: str = os.path.join(".", "manager.py")) -> None:
-        self._db = Database(Database.settings_db_name)
-        self._kafka_string = SECRETS_MANAGER.get_kafka_string()
-        self.kafka_debug = SETTINGS_MANAGER.kafka_debug 
 
-        watched_organizations = SETTINGS_MANAGER.organizations
-        self._pending_match_dict: dict = (
-            {}
-            if len(watched_organizations) == 0
-            else {"organization": {"$in": watched_organizations}}
-        )
-        self._pending_match_dict.update({"examined": None})
+    def __init__(self, manager_path: str = os.path.join(".", "manager.py")) -> None:
+        self._kafka_string = SECRETS_MANAGER.get_kafka_string()
+        self.kafka_debug = SETTINGS_MANAGER.kafka_debug
 
         self._manager_path = manager_path
         self._current_dir = os.path.dirname(os.path.abspath(__file__))
-         
+
         self.settings = SETTINGS_MANAGER.listener
         self.cpu_number = os.cpu_count() or 0
         self.max_workers = max(
@@ -72,17 +61,17 @@ class Listener:
         except BaseException as exception:  # pylint:disable=W0718
             print("Listener error", f"Error when starting manager: {exception}")
 
-    async def start(self): 
+    async def start(self):
         """Starts listener loop"""
-        
+
         consumer = AIOKafkaConsumer(
             "attempt",
-            bootstrap_servers = self._kafka_string,
+            bootstrap_servers=self._kafka_string,
             auto_commit_interval_ms=1000,
             auto_offset_reset="earliest",
-            group_id="kafka_test"
+            group_id="kafka_test",
         )
-        
+
         await consumer.start()
         try:
             while True:
@@ -90,22 +79,24 @@ class Listener:
                     async for attempt in consumer:
                         attempt = attempt.value.decode("utf-8")
                         attempt = json.loads(attempt)
-                        
+
                         attempt_spec = attempt["attempt"]
                         author_login = attempt["author"]
                         task_spec = attempt["task"]
                         organization_spec = attempt["organization"]
 
                         if self.kafka_debug:
-                            print(f"\nattempt: {attempt_spec}\n\tlogin: {author_login}\n\ttask: {task_spec}\n\torg: {organization_spec}")
+                            print(
+                                f"\nattempt: {attempt_spec}\n\tlogin: {author_login}\n\ttask: {task_spec}\n\torg: {organization_spec}"
+                            )
 
                         executor.submit(
-                                self.submit_to_manager,
-                                attempt_spec,
-                                author_login,
-                                task_spec,
-                                organization_spec,
-                            )
+                            self.submit_to_manager,
+                            attempt_spec,
+                            author_login,
+                            task_spec,
+                            organization_spec,
+                        )
         except KeyboardInterrupt:
             print("\nExit")
             sys.exit(0)

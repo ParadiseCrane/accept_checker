@@ -1,7 +1,7 @@
 """Contains the SecretsManager class instances"""
 
 import os
-from typing import Any, Dict
+from typing import Any
 
 import dotenv
 
@@ -11,9 +11,8 @@ class SecretsManager:
 
     def __init__(self, path: str = os.path.join(".", ".env")) -> None:
         self._path = path
-        self._secrets: Dict[str, Any] = dotenv.dotenv_values(self._path)
-        self._mongodb_connection_string: str = self._secrets["CONNECTION_STRING"]  # type: ignore
-        self._mongodb_database_name: str = self._secrets["DATABASE_NAME"]  # type: ignore
+        self._secrets: dict[str, Any] = dotenv.dotenv_values(self._path)
+        self._mongodb_connection_string: str = self._secrets["CONNECTION_STRING"]
         self._kafka_connection_string: str = self._secrets["KAFKA_CONNECTION"]
 
     def get_connection_string(self) -> str:
@@ -31,15 +30,6 @@ class SecretsManager:
             str: Kafka connection string
         """
         return self._kafka_connection_string
-
-    def get_database_name(self) -> str:
-        #! Deprecated
-        """Returns MongoDB database name
-
-        Returns:
-            str: MongoDB database name
-        """
-        return self._mongodb_database_name
 
 
 SECRETS_MANAGER = SecretsManager()
