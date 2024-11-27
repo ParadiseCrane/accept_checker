@@ -44,9 +44,14 @@ RUN tar -C /usr/local -xzf go.tar.gz
 ENV PATH="$PATH:/usr/local/go/bin"
 
 WORKDIR ..
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+ENV UV_LINK_MODE=copy
 
 COPY . .
 
-CMD [ "python", "./main.py"]
+RUN uv sync --frozen
+ 
+#CMD ["sh", "-c", "ls"]
+
+CMD ["uv", "run", "main.py"]
