@@ -52,6 +52,5 @@ COPY . .
 
 RUN uv sync --frozen
  
-#CMD ["sh", "-c", "ls"]
 
 CMD ["uv", "run", "main.py"]

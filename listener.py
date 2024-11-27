@@ -5,7 +5,7 @@ import json
 import os
 import subprocess
 import sys
-
+import time
 from aiokafka import AIOKafkaConsumer
 
 from local_secrets import SECRETS_MANAGER
@@ -25,6 +25,7 @@ class Listener:
 
         self.settings = SETTINGS_MANAGER.listener
         self.cpu_number = os.cpu_count() or 0
+        self.busy_cpu = 0
         self.max_workers = max(
             2,
             int(self.cpu_number * self.settings.cpu_utilization_fraction),
@@ -46,6 +47,7 @@ class Listener:
             organization_spec (str): spec of organization
 
         """
+
         try:
             subprocess.run(
                 [
@@ -57,10 +59,16 @@ class Listener:
                     organization_spec,
                 ],
                 check=True,
+                capture_output=True,
             )
 
         except BaseException as exception:  # pylint:disable=W0718
             print("Listener error", f"Error when starting manager: {exception}")
+
+    def attempt_checked(self, attempt_spec):
+        self.busy_cpu -= 1
+        if self._debug:
+            print(f"attempt {attempt_spec} checked!")
 
     async def start(self):
         """Starts listener loop"""
@@ -77,31 +85,40 @@ class Listener:
 
         try:
             while True:
+                if self.busy_cpu >= self.max_workers:
+                    time.sleep(self.settings.sleep_timeout_seconds)
+                    continue
                 with pool.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-                    async for attempt in consumer:
-                        attempt = attempt.value.decode("utf-8")
-                        attempt = json.loads(attempt)
+                    result = await consumer.getmany(
+                        max_records=self.max_workers - self.busy_cpu, timeout_ms=10000
+                    )
+                    for _, attempts in result.items():
+                        for attempt in attempts:
+                            attempt = attempt.value.decode("utf-8")
+                            attempt = json.loads(attempt)
 
-                        attempt_spec = attempt["attempt"]
-                        author_login = attempt["author"]
-                        task_spec = attempt["task"]
-                        organization_spec = attempt["organization"]
+                            attempt_spec = attempt["attempt"]
+                            author_login = attempt["author"]
+                            task_spec = attempt["task"]
+                            organization_spec = attempt["organization"]
 
-                        if self._debug:
-                            print(
-                                f"\nattempt: {attempt_spec}\n\tlogin: {author_login}\n\ttask: {task_spec}\n\torg: {organization_spec}"
+                            if self._debug:
+                                print(
+                                    f"\nattempt: {attempt_spec}\n\tlogin: {author_login}\n\ttask: {task_spec}\n\torg: {organization_spec}"
+                                )
+
+                            self.busy_cpu += 1
+                            future = executor.submit(
+                                Listener.submit_to_manager,
+                                attempt_spec,
+                                author_login,
+                                task_spec,
+                                organization_spec,
                             )
 
-                        future = executor.submit(
-                            Listener.submit_to_manager,
-                            attempt_spec,
-                            author_login,
-                            task_spec,
-                            organization_spec,
-                        )
-
-                        if self._debug:
-                            future.add_done_callback(lambda _: print("Finished!"))
+                            future.add_done_callback(
+                                lambda _: self.attempt_checked(attempt_spec)
+                            )
 
         except KeyboardInterrupt:
             print("\nExit")
