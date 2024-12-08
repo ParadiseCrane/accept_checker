@@ -1,56 +1,65 @@
-FROM python:3.10.8-slim-buster AS runner
+FROM python:3.12-alpine AS prepare
 
-RUN apt-get clean all
-RUN apt-get update
+RUN apk update
 
-RUN apt-get install -y unzip wget
+RUN apk add --no-cache unzip wget
 
 # pascal
-RUN apt-get install -y mono-complete mono-devel
+# RUN apk add --no-cache mono mono-devel
+RUN echo "@testing http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories \
+    && apk add --update mono@testing mono-dev@testing \
+    && rm -rf /var/cache/apk/*
 # c++
-RUN apt-get install -y gcc g++
+RUN apk add --no-cache gcc g++
 # java
-RUN apt-get install -y openjdk-11-jdk openjdk-11-jre
+RUN apk add --no-cache openjdk11-jdk openjdk11-jre
 # pypy
-RUN apt-get install -y pypy3
+RUN apk add --no-cache pypy3@testing
 # lua
-RUN apt-get install -y lua5.3
+RUN apk add --no-cache lua5.3
 # cobol
-RUN apt-get install -y gnucobol
+# RUN apk add --no-cache gnucobol
 # haskell
-RUN apt-get install -y ghc ghc-prof ghc-doc
+RUN apk add --no-cache ghc ghc-doc
 # fortran
-RUN apt-get install -y gfortran
+RUN apk add --no-cache gfortran
 # rust
-RUN apt install -y rustc
+RUN apk add --no-cache rust
 
 
 WORKDIR /pascal
-RUN wget "http://pascalabc.net/downloads/PascalABCNETLinux.zip"
-RUN unzip "PascalABCNETLinux.zip" "PascalABCNETLinux/*"
-RUN echo '#! /bin/sh' >> /bin/pabcnetc
-RUN echo 'mono /pascal/PascalABCNETLinux/pabcnetcclear.exe $1' >> /bin/pabcnetc
-RUN chmod u+x /bin/pabcnetc
+RUN wget "http://pascalabc.net/downloads/PascalABCNETLinux.zip" && \
+  unzip "PascalABCNETLinux.zip" "PascalABCNETLinux/*" && \
+  echo '#! /bin/sh' >> /bin/pabcnetc && \
+  echo 'mono /pascal/PascalABCNETLinux/pabcnetcclear.exe $1' >> /bin/pabcnetc && \
+  chmod u+x /bin/pabcnetc && \
+  rm PascalABCNETLinux.zip
 
-WORKDIR ../node
-RUN wget "https://nodejs.org/dist/v18.16.1/node-v18.16.1-linux-x64.tar.xz"
-RUN tar -xf node-v18.16.1-linux-x64.tar.xz
-RUN mv node-v18.16.1-linux-x64/bin/node /bin/node
+WORKDIR /node
+RUN wget "https://nodejs.org/dist/v18.16.1/node-v18.16.1-linux-x64.tar.xz" && \
+  tar -xf node-v18.16.1-linux-x64.tar.xz && \
+  mv node-v18.16.1-linux-x64/bin/node /bin/node && \
+  rm node-v18.16.1-linux-x64.tar.xz
 
 
-WORKDIR ../go
-RUN wget "https://go.dev/dl/go1.20.5.linux-amd64.tar.gz" -O go.tar.gz
-RUN tar -C /usr/local -xzf go.tar.gz
+WORKDIR /go
+RUN wget "https://go.dev/dl/go1.23.4.linux-amd64.tar.gz" -O go.tar.gz && \
+  tar -C /usr/local -xzf go.tar.gz && \
+  rm go.tar.gz
 ENV PATH="$PATH:/usr/local/go/bin"
 
-WORKDIR ..
-
+FROM prepare AS builder
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 ENV UV_LINK_MODE=copy
 
-COPY . .
+COPY uv.lock pyproject.toml /app/
+WORKDIR /app
 
 RUN uv sync --frozen
- 
+
+FROM builder AS runner
+
+ADD . /app/
+WORKDIR /app
 
 CMD ["uv", "run", "main.py"]
