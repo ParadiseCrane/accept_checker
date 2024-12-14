@@ -1,11 +1,11 @@
 """Contains Custom checker class"""
 
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from checker.basic import CodeChecker
 from custom_exceptions import CompilationErrorException
 from custom_process import CustomProcess
-from models import Attempt, Language, PendingQueueItem, TaskTest
+from models import Attempt, BasicTaskInfo, Language, TaskTest
 from program_languages.utils import get_language_class
 from utils.basic import (
     VerdictType,
@@ -26,7 +26,7 @@ class CustomChecker(CodeChecker):
 
     def _check_test(
         self,
-        task_tests: List[TaskTest],
+        task_tests: list[TaskTest],
         index: int,
         verdict: Optional[VerdictType],
         program_output: Optional[str],
@@ -54,19 +54,19 @@ class CustomChecker(CodeChecker):
 
     async def start(  # pylint:disable=W0221
         self,
-        checker: PendingQueueItem.Checker,
+        checker: BasicTaskInfo.Checker,
         attempt: Attempt,
-        grouped_tests: List[List[TaskTest]],
+        grouped_tests: list[list[TaskTest]],
         folder_path: str,
         program_language: Language,
         checker_language: Language,
-    ) -> Tuple[List[int], List[str]]:
+    ) -> tuple[list[int], list[str]]:
         """Starts checker
 
         Args:
-            checker (PendingQueueItem.Checker): program checker
+            checker (BasicTaskInfo.Checker): program checker
             attempt (Attempt): user attempt
-            grouped_tests (List[List[TaskTest]]): grouped task tests
+            grouped_tests (list[list[TaskTest]]): grouped task tests
             folder_path (str): path to the testing folder
             program_language (Language): Language model
             checker_language (Language): checker Language model

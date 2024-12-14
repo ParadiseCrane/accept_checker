@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import time
 from datetime import datetime
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable
 
 import psutil
 
@@ -63,9 +63,7 @@ class Tuner:
             pass
         return cpu_time_usage + self.test_sleep_seconds
 
-    def _mem_test(
-        self, process: psutil.Popen, language_class: ProgramLanguage
-    ) -> float:
+    def _mem_test(self, process: psutil.Popen, language_class: ProgramLanguage) -> float:
         memory_usage = 0
         total_sleep = 0
 
@@ -86,7 +84,7 @@ class Tuner:
 
     def _run_cmd_test(
         self,
-        cmd: List[str],
+        cmd: list[str],
         test_function: Callable[[psutil.Popen, ProgramLanguage], float],
         language_class: ProgramLanguage,
     ) -> float:
@@ -109,7 +107,7 @@ class Tuner:
 
             return info_result
 
-        test_runs: List[float] = []
+        test_runs: list[float] = []
         for _ in range(self.test_runs_count):
             test_runs.append(run_test())
 
@@ -122,7 +120,7 @@ class Tuner:
         source_code: str,
         test_function: Callable[[psutil.Popen, ProgramLanguage], float],
         language_class: ProgramLanguage,
-    ) -> Tuple[Any, Any]:
+    ) -> tuple[Any, Any]:
         file_name = self._write_program(source_code, language_class)
 
         compile_result = self._run_cmd_test(
@@ -141,7 +139,7 @@ class Tuner:
 
         return compile_result, run_result
 
-    def _tune_language(self, language: Language) -> Tuple[float, float, int]:
+    def _tune_language(self, language: Language) -> tuple[float, float, int]:
         language_class: ProgramLanguage = get_language_class(language.short_name)
 
         time_offset_code, mem_offset_code = language_class.get_offset_codes()

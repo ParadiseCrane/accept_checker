@@ -1,7 +1,5 @@
 """Contains Text Checker class"""
 
-from typing import List, Tuple
-
 from checker.basic import Checker
 from utils.basic import generate_tests_verdicts, group_values, map_verdict
 
@@ -11,13 +9,13 @@ class TextChecker(Checker):
 
     def _test_group(
         self,
-        user_answers: List[str],
-        correct_answers: List[str],
-    ) -> Tuple[bool, List[int]]:
+        user_answers: list[str],
+        correct_answers: list[str],
+    ) -> tuple[bool, list[int]]:
         all_correct = True
 
         user_answers_length = len(user_answers)
-        verdicts: List[int] = []
+        verdicts: list[int] = []
         for i, correct_answer in enumerate(correct_answers):
             if i < user_answers_length and self._compare_strings(
                 correct_answer, user_answers[i]
@@ -33,10 +31,10 @@ class TextChecker(Checker):
 
     async def start(
         self,
-        user_answers: List[str],
-        correct_answers: List[str],
-        test_groups: List[int],
-    ) -> Tuple[List[int], List[str]]:
+        user_answers: list[str],
+        correct_answers: list[str],
+        test_groups: list[int],
+    ) -> tuple[list[int], list[str]]:
         """Starts checker
 
         Args:
@@ -48,15 +46,15 @@ class TextChecker(Checker):
             tuple[list[int], list[str]]: (verdicts, logs)
         """
 
-        grouped_user_answers: List[List[str]] = group_values(user_answers, test_groups)
-        grouped_correct_answers: List[List[str]] = group_values(
+        grouped_user_answers: list[list[str]] = group_values(user_answers, test_groups)
+        grouped_correct_answers: list[list[str]] = group_values(
             correct_answers, test_groups
         )
 
         grouped_user_answers_len = len(grouped_user_answers)
 
         all_correct = True
-        verdicts: List[int] = []
+        verdicts: list[int] = []
         for i, correct_answers_group in enumerate(grouped_correct_answers):
             if not all_correct:
                 verdicts += generate_tests_verdicts("NT", len(correct_answers_group))

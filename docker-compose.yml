@@ -1,0 +1,4 @@
+services:
+  checker-1:
+    build: .
+    network_mode: host 

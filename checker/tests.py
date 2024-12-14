@@ -1,7 +1,5 @@
 """Contains Tests Checker class"""
 
-from typing import List, Tuple
-
 from checker.basic import CodeChecker
 from custom_exceptions import CompilationErrorException
 from models import Attempt, Language, TaskTest
@@ -15,15 +13,15 @@ class TestsChecker(CodeChecker):
     async def start(  # pylint:disable=W0221:arguments-differ
         self,
         attempt: Attempt,
-        grouped_tests: List[List[TaskTest]],
+        grouped_tests: list[list[TaskTest]],
         folder_path: str,
         language: Language,
-    ) -> Tuple[List[int], List[str]]:
+    ) -> tuple[list[int], list[str]]:
         """Starts checker
 
         Args:
             attempt (Attempt): attempt model
-            grouped_tests (List[List[TaskTest]]): grouped task tests
+            grouped_tests (list[list[TaskTest]]): grouped task tests
             folder_path (str): path to the testing folder
             language (Language): Language model
 

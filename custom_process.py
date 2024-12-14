@@ -4,7 +4,7 @@ import concurrent.futures as pool
 import resource  # pylint: disable=E0401
 import subprocess
 from time import sleep
-from typing import Any, Callable, List
+from typing import Any, Callable
 
 import psutil
 
@@ -28,7 +28,7 @@ class CustomProcess:
 
     def __init__(
         self,
-        cmd: List[str],
+        cmd: list[str],
         get_memory_usage: Callable[[Any], float],
         compilation: bool,
     ):
@@ -38,9 +38,7 @@ class CustomProcess:
 
         self.sleep_time = 0.05
 
-    def _check_info(
-        self, process: psutil.Popen, time_limit: float, memory_limit: float
-    ):
+    def _check_info(self, process: psutil.Popen, time_limit: float, memory_limit: float):
         total_sleep = 0
         try:
             while process.is_running():
