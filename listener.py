@@ -1,53 +1,42 @@
 """Contains Listener for database updates class"""
 
-import asyncio
 import concurrent.futures as pool
+import json
 import os
 import subprocess
 import sys
-from typing import Any, List
+import time
+from aiokafka import AIOKafkaConsumer
 
-from database import DATABASE
+from local_secrets import SECRETS_MANAGER
 from settings import SETTINGS_MANAGER
 
 
 class Listener:
     """Listens to database updates"""
 
-    async def _get_pending_items(self, limit: int = 10) -> List[Any]:
-        collection = DATABASE.get_collection(self._pending_attempts_collection_name)
+    _manager_path = os.path.join(".", "manager.py")
 
-        item_dicts: Any = []
-        async for queue_item in collection.aggregate(
-            [
-                {"$match": {"examined": None}},
-                {"$limit": limit},
-                {"$project": {"author": 1, "task": 1, "attempt": 1}},
-            ]
-        ):
-            item_dicts.append(queue_item)
+    def __init__(self) -> None:
+        self._kafka_string = SECRETS_MANAGER.kafka_string
+        self._debug = SECRETS_MANAGER.debug
 
-        await collection.update_many(
-            {"attempt": {"$in": list(map(lambda item: item["attempt"], item_dicts))}},
-            {"$set": {"examined": True}},
-        )
-
-        return item_dicts
-
-    def __init__(self, manager_path: str = os.path.join(".", "manager.py")) -> None:
-        self._manager_path = manager_path
         self._current_dir = os.path.dirname(os.path.abspath(__file__))
-        self._pending_attempts_collection_name = "pending_task_attempt"
 
         self.settings = SETTINGS_MANAGER.listener
         self.cpu_number = os.cpu_count() or 0
+        self.busy_cpu = 0
         self.max_workers = max(
             2,
             int(self.cpu_number * self.settings.cpu_utilization_fraction),
         )
 
+    @staticmethod
     def submit_to_manager(
-        self, attempt_spec: str, author_login: str, task_spec: str
+        attempt_spec: str,
+        author_login: str,
+        task_spec: str,
+        organization_spec: str,
     ) -> None:
         """Submits attempt to Manager in separate process
 
@@ -55,43 +44,87 @@ class Listener:
             attempt_spec (str): spec of attempt
             author_login (str): login of author
             task_spec (str): spec of task
+            organization_spec (str): spec of organization
 
         """
+
         try:
             subprocess.run(
-                ["python", self._manager_path, attempt_spec, author_login, task_spec],
+                [
+                    "python",
+                    Listener._manager_path,
+                    attempt_spec,
+                    author_login,
+                    task_spec,
+                    organization_spec,
+                ],
                 check=True,
+                capture_output=True,
             )
+
         except BaseException as exception:  # pylint:disable=W0718
             print("Listener error", f"Error when starting manager: {exception}")
+
+    def attempt_checked(self, attempt_spec):
+        self.busy_cpu -= 1
+        if self._debug:
+            print(f"attempt {attempt_spec} checked!")
 
     async def start(self):
         """Starts listener loop"""
 
-        try:
-            with pool.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-                while True:
-                    try:
-                        queue_items = await self._get_pending_items()
-                        for queue_item in queue_items:
-                            attempt_spec = queue_item["attempt"]
-                            author_login = queue_item["author"]
-                            task_spec = queue_item["task"]
+        consumer = AIOKafkaConsumer(
+            "attempt",
+            bootstrap_servers=self._kafka_string,
+            auto_commit_interval_ms=1000,
+            auto_offset_reset="earliest",
+            group_id="kafka_test",
+        )
 
-                            executor.submit(
-                                self.submit_to_manager,
+        await consumer.start()
+
+        try:
+            while True:
+                if self.busy_cpu >= self.max_workers:
+                    time.sleep(self.settings.sleep_timeout_seconds)
+                    continue
+                with pool.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+                    result = await consumer.getmany(
+                        max_records=self.max_workers - self.busy_cpu, timeout_ms=10000
+                    )
+                    for _, attempts in result.items():
+                        for attempt in attempts:
+                            attempt = attempt.value.decode("utf-8")
+                            attempt = json.loads(attempt)
+
+                            attempt_spec = attempt["attempt"]
+                            author_login = attempt["author"]
+                            task_spec = attempt["task"]
+                            organization_spec = attempt["organization"]
+
+                            if self._debug:
+                                print(
+                                    f"\nattempt: {attempt_spec}\n\tlogin: {author_login}\n\ttask: {task_spec}\n\torg: {organization_spec}"
+                                )
+
+                            self.busy_cpu += 1
+                            future = executor.submit(
+                                Listener.submit_to_manager,
                                 attempt_spec,
                                 author_login,
                                 task_spec,
+                                organization_spec,
                             )
 
-                    except BaseException as exception:  # pylint:disable=W0718
-                        print(exception)
+                            future.add_done_callback(
+                                lambda _: self.attempt_checked(attempt_spec)
+                            )
 
-                    await asyncio.sleep(self.settings.sleep_timeout_seconds)
         except KeyboardInterrupt:
             print("\nExit")
             sys.exit(0)
+        finally:
+            await consumer.stop()
 
 
 LISTENER = Listener()

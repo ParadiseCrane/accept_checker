@@ -1,7 +1,7 @@
 """Contains MongoDB database class instances"""
 
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import motor.motor_asyncio
 
@@ -11,14 +11,17 @@ from local_secrets import SECRETS_MANAGER
 class Database:
     """Manages database stuff"""
 
+    settings_db_name = "_settings"
+
     def _connect(self):
         self.client: Any = motor.motor_asyncio.AsyncIOMotorClient(
-            SECRETS_MANAGER.get_connection_string()
+            SECRETS_MANAGER.connection_string
         )
         self.client.get_io_loop = asyncio.get_running_loop
-        self.database = self.client[SECRETS_MANAGER.get_database_name()]
+        self.database = self.client[self._organization]
 
-    def __init__(self) -> None:
+    def __init__(self, organization: str) -> None:
+        self._organization = organization
         self._connect()
 
     def get_collection(self, collection_name: str) -> Any:
@@ -33,8 +36,8 @@ class Database:
     async def find_one(
         self,
         collection_name: str,
-        match_dict: Dict[str, Any],
-        filter_dict: Optional[Dict[str, Any]] = None,
+        match_dict: dict[str, Any],
+        filter_dict: Optional[dict[str, Any]] = None,
     ):
         """Returns one element from collection
 
@@ -51,7 +54,7 @@ class Database:
 
         return await collection.find_one(match_dict, filter_dict)
 
-    async def delete_one(self, collection_name: str, match_dict: Dict[str, Any]):
+    async def delete_one(self, collection_name: str, match_dict: dict[str, Any]):
         """Deletes one element from collection
 
         Args:
@@ -66,7 +69,7 @@ class Database:
 
         return await collection.delete_one(match_dict)
 
-    async def insert_one(self, collection_name: str, element: Dict[str, Any]):
+    async def insert_one(self, collection_name: str, element: dict[str, Any]):
         """Inserts one element to collection
 
         Args:
@@ -84,8 +87,8 @@ class Database:
     async def update_one(
         self,
         collection_name: str,
-        match_dict: Dict[str, Any],
-        update_dict: Dict[str, Any],
+        match_dict: dict[str, Any],
+        update_dict: dict[str, Any],
         upsert: bool = False,
     ) -> Any:
         """Updates one element from collection
@@ -107,18 +110,18 @@ class Database:
     async def find(
         self,
         collection_name: str,
-        match_dict: Optional[Dict[str, Any]] = None,
-        filter_dict: Optional[Dict[str, Any]] = None,
-    ) -> List[Any]:
+        match_dict: Optional[dict[str, Any]] = None,
+        filter_dict: Optional[dict[str, Any]] = None,
+    ) -> list[Any]:
         """Returns elements from collection
 
         Args:
             collection_name (str): collection name
-            match_dict (Optional[Dict[str, Any]], optional): match dictionary. Defaults to None.
-            filter_dict (Optional[Dict[str, Any]], optional): filter dictionary. Defaults to None.
+            match_dict (Optional[dict[str, Any]], optional): match dictionary. Defaults to None.
+            filter_dict (Optional[dict[str, Any]], optional): filter dictionary. Defaults to None.
 
         Returns:
-            List[Any]: result
+            list[Any]: result
         """
 
         collection = self.get_collection(collection_name)
@@ -128,6 +131,3 @@ class Database:
             results.append(result)
 
         return results
-
-
-DATABASE = Database()

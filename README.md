@@ -14,6 +14,22 @@ Tested on **Ubuntu 20.04.3 LTS**
 - python3
 - pypy3
 
+## Kafka Setup
+
+sh building.sh
+
+Then add path to kafka to .env
+
 ## Before start
 
-pipenv install
+`uv sync`
+
+## Start
+
+`uv run main.py`
+
+## Pylint comments
+
+Code becomes larger, so pylint becomes slower. If it is too slow, then remove it using `uv remove pylint`.
+
+Also remove corresponding line in `setup_precommit.sh` and run it.

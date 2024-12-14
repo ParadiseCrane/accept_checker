@@ -1,6 +1,5 @@
 """Starts the listener and the scheduler"""
 
-
 import asyncio
 
 from listener import LISTENER

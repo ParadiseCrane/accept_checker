@@ -5,28 +5,28 @@ import shutil
 import sys
 import time
 from datetime import datetime, timezone
-from typing import Dict, List, Literal, Union
+from typing import Literal
 
 import psutil
 
-from database import DATABASE
+from database import Database
 from models import Attempt
 from settings import SETTINGS_MANAGER
 from utils.soft_mkdir import soft_mkdir
 
-VerdictType = Union[
-    Literal["OK"],
-    Literal["TL"],
-    Literal["WA"],
-    Literal["CE"],
-    Literal["RE"],
-    Literal["SE"],
-    Literal["NT"],
-    Literal["ML"],
-    Literal["CH"],
+VerdictType = Literal[
+    "OK",
+    "TL",
+    "WA",
+    "CE",
+    "RE",
+    "SE",
+    "NT",
+    "ML",
+    "CH",
 ]
 
-VERDICT_DICT: Dict[VerdictType, int] = dict(
+VERDICT_DICT: dict[VerdictType, int] = dict(
     {
         "OK": 0,
         "TL": 1,
@@ -50,11 +50,11 @@ ATTEMPT_STATUS_DICT = dict(
     }
 )
 
-AttemptStatusType = Union[
-    Literal["pending"],
-    Literal["testing"],
-    Literal["finished"],
-    Literal["banned"],
+AttemptStatusType = Literal[
+    "pending",
+    "testing",
+    "finished",
+    "banned",
 ]
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -78,7 +78,7 @@ def map_verdict(
 def generate_tests_verdicts(
     verdict: VerdictType,
     tests_number: int,
-) -> List[int]:
+) -> list[int]:
     """Generates same verdict for all tests
 
     Args:
@@ -128,7 +128,7 @@ async def send_alert(
         }
     )
 
-    await DATABASE.insert_one("checker_alert", alert)
+    await Database(Database.settings_db_name).insert_one("checker_alert", alert)
 
 
 def delete_folder(path: str):
@@ -205,9 +205,9 @@ def generate_program_name(
 
 
 def group_values(
-    values: List,
-    group_division: List[int],
-) -> List:
+    values: list,
+    group_division: list[int],
+) -> list:
     """Groups values based on slice indexes
 
     Args:
@@ -234,9 +234,9 @@ def group_values(
 
 
 def prepare_test_groups(
-    test_groups: List[int],
+    test_groups: list[int],
     total_tests: int,
-) -> List[int]:
+) -> list[int]:
     """Prepares test_groups from database for
     further using in group_values function
 

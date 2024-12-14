@@ -3,7 +3,7 @@
 import concurrent.futures as pool
 import os
 from itertools import zip_longest
-from typing import Any, List, Optional, Tuple
+from typing import Any, Optional
 
 from custom_exceptions import (
     CompilationErrorException,
@@ -38,7 +38,7 @@ class Checker:
                 return False
         return True
 
-    async def start(self) -> Tuple[List[int], List[str]]:
+    async def start(self) -> tuple[list[int], list[str]]:
         """Starts checker
 
         Args:
@@ -53,7 +53,7 @@ class Checker:
 class CodeChecker(Checker):
     """Code checker basic class"""
 
-    async def start(self) -> Tuple[List[int], List[str]]:
+    async def start(self) -> tuple[list[int], list[str]]:
         raise NotImplementedError
 
     def write_program_text(
@@ -122,9 +122,9 @@ class CodeChecker(Checker):
         process: CustomProcess,
         index: int,
         attempt: Attempt,
-        task_tests: List[TaskTest],
+        task_tests: list[TaskTest],
         language: Language,
-    ) -> Tuple[int, Optional[VerdictType], Optional[str]]:
+    ) -> tuple[int, Optional[VerdictType], Optional[str]]:
         verdict = None
         result = None
         try:
@@ -151,7 +151,7 @@ class CodeChecker(Checker):
 
     def _check_test(
         self,
-        task_tests: List[TaskTest],
+        task_tests: list[TaskTest],
         index: int,
         verdict: Optional[VerdictType],
         program_output: Optional[str],
@@ -171,9 +171,9 @@ class CodeChecker(Checker):
         process: CustomProcess,
         index: int,
         attempt: Attempt,
-        task_tests: List[TaskTest],
+        task_tests: list[TaskTest],
         language: Language,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         index, verdict, result = self._run_test(
             process, index, attempt, task_tests, language
         )
@@ -184,17 +184,17 @@ class CodeChecker(Checker):
         folder_path: str,
         program_name: str,
         attempt: Attempt,
-        task_tests: List[TaskTest],
+        task_tests: list[TaskTest],
         language: Language,
         language_class: ProgramLanguage,
-    ) -> List[int]:
+    ) -> list[int]:
         """Runs tests for the given program
 
         Args:
             folder_path (str): path to the testing folder
             program_name (str): name of the program
             attempt (Attempt): user's attempt
-            task_tests (List[TaskTest]): tests of task
+            task_tests (list[TaskTest]): tests of task
             language (Language): language of the attempt
             language_class (ProgramLanguage): language class
 
@@ -213,7 +213,7 @@ class CodeChecker(Checker):
                 for _ in range(len(task_tests))
             ]
 
-            pool_processes: List[Any] = []
+            pool_processes: list[Any] = []
             for index, process in enumerate(processes):
                 pool_processes.append(
                     executor.submit(

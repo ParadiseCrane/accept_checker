@@ -7,11 +7,11 @@ import shutil
 import subprocess
 import time
 from datetime import datetime
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable
 
 import psutil
 
-from database import DATABASE
+from database import Database
 from date import DATE_TIME_INFO
 from models import Language
 from program_languages.basic import ProgramLanguage
@@ -63,9 +63,7 @@ class Tuner:
             pass
         return cpu_time_usage + self.test_sleep_seconds
 
-    def _mem_test(
-        self, process: psutil.Popen, language_class: ProgramLanguage
-    ) -> float:
+    def _mem_test(self, process: psutil.Popen, language_class: ProgramLanguage) -> float:
         memory_usage = 0
         total_sleep = 0
 
@@ -86,7 +84,7 @@ class Tuner:
 
     def _run_cmd_test(
         self,
-        cmd: List[str],
+        cmd: list[str],
         test_function: Callable[[psutil.Popen, ProgramLanguage], float],
         language_class: ProgramLanguage,
     ) -> float:
@@ -109,7 +107,7 @@ class Tuner:
 
             return info_result
 
-        test_runs: List[float] = []
+        test_runs: list[float] = []
         for _ in range(self.test_runs_count):
             test_runs.append(run_test())
 
@@ -122,7 +120,7 @@ class Tuner:
         source_code: str,
         test_function: Callable[[psutil.Popen, ProgramLanguage], float],
         language_class: ProgramLanguage,
-    ) -> Tuple[Any, Any]:
+    ) -> tuple[Any, Any]:
         file_name = self._write_program(source_code, language_class)
 
         compile_result = self._run_cmd_test(
@@ -141,7 +139,7 @@ class Tuner:
 
         return compile_result, run_result
 
-    def _tune_language(self, language: Language) -> Tuple[float, float, int]:
+    def _tune_language(self, language: Language) -> tuple[float, float, int]:
         language_class: ProgramLanguage = get_language_class(language.short_name)
 
         time_offset_code, mem_offset_code = language_class.get_offset_codes()
@@ -154,16 +152,8 @@ class Tuner:
 
         return compile_offset_seconds, run_offset_seconds, run_memory_offset_bytes
 
-    def __init__(self):
-        self.test_sleep_seconds = 0.001
-        self.mem_time_limit_seconds = 3
-        self.test_runs_count = SETTINGS_MANAGER.tuner.test_runs_count
-        self.folder_path = os.path.join(".", SETTINGS_MANAGER.tuner.tests_folder)
-        soft_mkdir(self.folder_path)
-
-    async def start(self):
-        """Starts tuner"""
-        language_dicts = await DATABASE.find("language")
+    async def _start(self, db: Database):
+        language_dicts = await db.find("language")
 
         languages = [Language(language_dict) for language_dict in language_dicts]
 
@@ -175,7 +165,7 @@ class Tuner:
                     memory_offset_bytes,
                 ) = self._tune_language(language)
 
-                await DATABASE.update_one(
+                await db.update_one(
                     "language",
                     {"spec": language.spec},
                     {
@@ -194,6 +184,19 @@ class Tuner:
                     "Tuner failure", f"language {language.short_name}\n{str(exc)}"
                 )
                 continue
+
+    def __init__(self):
+        self.test_sleep_seconds = 0.001
+        self.mem_time_limit_seconds = 3
+        self.test_runs_count = SETTINGS_MANAGER.tuner.test_runs_count
+        self.folder_path = os.path.join(".", SETTINGS_MANAGER.tuner.tests_folder)
+        soft_mkdir(self.folder_path)
+
+    async def start(self):
+        """Starts tuner"""
+
+        for organization in SETTINGS_MANAGER.organizations:
+            await self._start(Database(organization))
 
 
 if __name__ == "__main__":
