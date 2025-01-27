@@ -128,7 +128,7 @@ async def send_alert(
         }
     )
 
-    await Database(Database.settings_db_name).insert_one("checker_alert", alert)
+    await Database().insert_one("checker_alert", alert)
 
 
 def delete_folder(path: str):

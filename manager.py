@@ -66,6 +66,26 @@ def _soft_run(func: Callable[..., Any]) -> Callable[..., Coroutine[Any, Any, Any
 class Manager:
     """Manages different checkers and task types"""
 
+    def __init__(self) -> None:
+        self._db = Database()
+
+        self._current_dir = os.path.dirname(os.path.abspath(__file__))
+        self._task_type_handler = {
+            0: self._handle_code_task,
+            1: self._handle_text_task,
+        }
+
+        self._task_check_type_handler = {
+            0: self._handle_tests_checker,
+            1: self._handle_custom_checker,
+        }
+
+        self.text_checker_class = TextChecker
+        self.tests_checker_class = TestsChecker
+        self.custom_checker_class = CustomChecker
+
+        self.settings = SETTINGS_MANAGER.manager
+
     async def _set_testing(
         self, attempt: Attempt, author_login: str, task_spec: str
     ) -> bool:
@@ -389,26 +409,6 @@ class Manager:
 
         await self._save_results(attempt, author_login, task_spec, verdicts, logs)
 
-    def __init__(self, organization: str) -> None:
-        self._db = Database(organization)  # org
-
-        self._current_dir = os.path.dirname(os.path.abspath(__file__))
-        self._task_type_handler = {
-            0: self._handle_code_task,
-            1: self._handle_text_task,
-        }
-
-        self._task_check_type_handler = {
-            0: self._handle_tests_checker,
-            1: self._handle_custom_checker,
-        }
-
-        self.text_checker_class = TextChecker
-        self.tests_checker_class = TestsChecker
-        self.custom_checker_class = CustomChecker
-
-        self.settings = SETTINGS_MANAGER.manager
-
     async def start(
         self,
         attempt_spec: str,
@@ -477,11 +477,6 @@ if __name__ == "__main__":
         attempt_spec_arg,
         author_login_arg,
         task_spec_arg,
-        organization_spec_arg,
     ) = sys.argv
 
-    asyncio.run(
-        Manager(organization_spec_arg).start(
-            attempt_spec_arg, author_login_arg, task_spec_arg
-        )
-    )
+    asyncio.run(Manager().start(attempt_spec_arg, author_login_arg, task_spec_arg))

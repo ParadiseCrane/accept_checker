@@ -152,8 +152,9 @@ class Tuner:
 
         return compile_offset_seconds, run_offset_seconds, run_memory_offset_bytes
 
-    async def _start(self, db: Database):
-        language_dicts = await db.find("language")
+    async def start(self):
+        """Starts tuner"""
+        language_dicts = await self.db.find("language")
 
         languages = [Language(language_dict) for language_dict in language_dicts]
 
@@ -165,7 +166,7 @@ class Tuner:
                     memory_offset_bytes,
                 ) = self._tune_language(language)
 
-                await db.update_one(
+                await self.db.update_one(
                     "language",
                     {"spec": language.spec},
                     {
@@ -186,17 +187,12 @@ class Tuner:
                 continue
 
     def __init__(self):
+        self.db = Database()
         self.test_sleep_seconds = 0.001
         self.mem_time_limit_seconds = 3
         self.test_runs_count = SETTINGS_MANAGER.tuner.test_runs_count
         self.folder_path = os.path.join(".", SETTINGS_MANAGER.tuner.tests_folder)
         soft_mkdir(self.folder_path)
-
-    async def start(self):
-        """Starts tuner"""
-
-        for organization in SETTINGS_MANAGER.organizations:
-            await self._start(Database(organization))
 
 
 if __name__ == "__main__":

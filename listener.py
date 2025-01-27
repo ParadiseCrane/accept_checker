@@ -38,7 +38,6 @@ class Listener:
         attempt_spec: str,
         author_login: str,
         task_spec: str,
-        organization_spec: str,
     ) -> None:
         """Submits attempt to Manager in separate process
 
@@ -46,8 +45,6 @@ class Listener:
             attempt_spec (str): spec of attempt
             author_login (str): login of author
             task_spec (str): spec of task
-            organization_spec (str): spec of organization
-
         """
 
         try:
@@ -58,7 +55,6 @@ class Listener:
                     attempt_spec,
                     author_login,
                     task_spec,
-                    organization_spec,
                 ],
                 check=True,
                 capture_output=True,
@@ -120,7 +116,6 @@ class Listener:
                                 attempt_spec,
                                 author_login,
                                 task_spec,
-                                organization_spec,
                             )
 
                             future.add_done_callback(
