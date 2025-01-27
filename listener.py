@@ -6,6 +6,8 @@ import os
 import subprocess
 import sys
 import time
+from typing import Any, Callable
+
 from aiokafka import AIOKafkaConsumer
 
 from local_secrets import SECRETS_MANAGER
@@ -70,6 +72,9 @@ class Listener:
         if self._debug:
             print(f"attempt {attempt_spec} checked!")
 
+    def _get_attempt_spec_callback(self, attempt_spec: str) -> Callable[[Any], None]:
+        return lambda _: self.attempt_checked(attempt_spec)
+
     async def start(self):
         """Starts listener loop"""
 
@@ -94,6 +99,8 @@ class Listener:
                     )
                     for _, attempts in result.items():
                         for attempt in attempts:
+                            if attempt.value is None:
+                                continue
                             attempt = attempt.value.decode("utf-8")
                             attempt = json.loads(attempt)
 
@@ -117,14 +124,15 @@ class Listener:
                             )
 
                             future.add_done_callback(
-                                lambda _: self.attempt_checked(attempt_spec)
+                                self._get_attempt_spec_callback(attempt_spec)
                             )
 
         except KeyboardInterrupt:
             print("\nExit")
             sys.exit(0)
         finally:
-            await consumer.stop()
+            if consumer:
+                await consumer.stop()
 
 
 LISTENER = Listener()

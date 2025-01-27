@@ -11,17 +11,14 @@ from local_secrets import SECRETS_MANAGER
 class Database:
     """Manages database stuff"""
 
-    settings_db_name = "_settings"
-
     def _connect(self):
         self.client: Any = motor.motor_asyncio.AsyncIOMotorClient(
             SECRETS_MANAGER.connection_string
         )
         self.client.get_io_loop = asyncio.get_running_loop
-        self.database = self.client[self._organization]
+        self.database = self.client[SECRETS_MANAGER.database]
 
-    def __init__(self, organization: str) -> None:
-        self._organization = organization
+    def __init__(self) -> None:
         self._connect()
 
     def get_collection(self, collection_name: str) -> Any:
