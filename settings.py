@@ -169,6 +169,7 @@ class SettingsManager:
 
     @property
     def organizations(self) -> list[str]:
+        """Organizations to listen"""
         return self._settings["organizations"]
 
 

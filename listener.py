@@ -6,6 +6,8 @@ import os
 import subprocess
 import sys
 import time
+from typing import Any, Callable
+
 from aiokafka import AIOKafkaConsumer
 
 from local_secrets import SECRETS_MANAGER
@@ -36,7 +38,6 @@ class Listener:
         attempt_spec: str,
         author_login: str,
         task_spec: str,
-        organization_spec: str,
     ) -> None:
         """Submits attempt to Manager in separate process
 
@@ -44,8 +45,6 @@ class Listener:
             attempt_spec (str): spec of attempt
             author_login (str): login of author
             task_spec (str): spec of task
-            organization_spec (str): spec of organization
-
         """
 
         try:
@@ -56,7 +55,6 @@ class Listener:
                     attempt_spec,
                     author_login,
                     task_spec,
-                    organization_spec,
                 ],
                 check=True,
                 capture_output=True,
@@ -69,6 +67,9 @@ class Listener:
         self.busy_cpu -= 1
         if self._debug:
             print(f"attempt {attempt_spec} checked!")
+
+    def _get_attempt_spec_callback(self, attempt_spec: str) -> Callable[[Any], None]:
+        return lambda _: self.attempt_checked(attempt_spec)
 
     async def start(self):
         """Starts listener loop"""
@@ -94,6 +95,8 @@ class Listener:
                     )
                     for _, attempts in result.items():
                         for attempt in attempts:
+                            if attempt.value is None:
+                                continue
                             attempt = attempt.value.decode("utf-8")
                             attempt = json.loads(attempt)
 
@@ -113,18 +116,18 @@ class Listener:
                                 attempt_spec,
                                 author_login,
                                 task_spec,
-                                organization_spec,
                             )
 
                             future.add_done_callback(
-                                lambda _: self.attempt_checked(attempt_spec)
+                                self._get_attempt_spec_callback(attempt_spec)
                             )
 
         except KeyboardInterrupt:
             print("\nExit")
             sys.exit(0)
         finally:
-            await consumer.stop()
+            if consumer:
+                await consumer.stop()
 
 
 LISTENER = Listener()
