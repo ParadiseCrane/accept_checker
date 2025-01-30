@@ -5,6 +5,7 @@ import logging
 
 from typing import Any
 from quixstreams import Application
+from quixstreams.models import TopicConfig
 from utils.basic import map_attempt_status
 from models import (
     Attempt,
@@ -70,9 +71,9 @@ class Listener:
         return self._manager.start(attempt)
 
     def detect_ai(self, tested_attempt: dict[str, Any]):
-        if tested_attempt["language"] not in [1, 2]: # Python, Pypy
+        if tested_attempt["language"] not in [1, 2]:  # Python, Pypy
             return
-        if tested_attempt["verdict"] != 0: # OK
+        if tested_attempt["verdict"] != 0:  # OK
             return
         tested_attempt.update({"detect_ai": True})
 
@@ -81,7 +82,10 @@ class Listener:
 
         app = Application(self._kafka_string, consumer_group="checker")
 
-        input_topic = app.topic("attempt_checker")
+        input_topic = app.topic(
+            name="attempt_checker",
+            config=TopicConfig(num_partitions=10, replication_factor=1),
+        )
         output_topic = app.topic("attempt_detect_ai")
         status_topic = app.topic("attempt_status")
 
