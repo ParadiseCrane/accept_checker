@@ -7,8 +7,8 @@ from typing import Optional
 @dataclass
 class TaskTest:
     spec: str
-    input_data: str
-    output_data: str
+    inputData: str
+    outputData: str
 
 
 @dataclass

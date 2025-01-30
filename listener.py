@@ -6,11 +6,21 @@ import logging
 from typing import Any
 from quixstreams import Application
 from utils.basic import map_attempt_status
-from models import Attempt, ProcessedAttempt
+from models import (
+    Attempt,
+    Task,
+    Checker,
+    Language,
+    TaskTest,
+    Constraints,
+)
 
 from manager import Manager
 from local_secrets import SECRETS_MANAGER
 from settings import SETTINGS_MANAGER
+
+
+logging.getLogger("Listener")
 
 
 class Listener:
@@ -36,13 +46,28 @@ class Listener:
     def set_testing(self, attempt: dict[str, Any]) -> dict[str, Any]:
         return {"spec": attempt["spec"], "status": map_attempt_status("testing")}
 
-    def set_finished(self, attempt: dict[str, Any]) -> dict[str, Any]:
-        return {"spec": attempt["spec"], "status": map_attempt_status("finished")}
+    def set_finished(self, tested_attempt: dict[str, Any]) -> dict[str, Any]:
+        return {"spec": tested_attempt["spec"], "status": map_attempt_status("finished")}
 
-    def test_attempt(self, attempt: dict[str, Any]) -> ProcessedAttempt:
-        logging.info(f"Testing attempt `{attempt["spec"]}`")
-        result = self._manager.start(Attempt(**attempt))
-        return result
+    def test_attempt(self, kafka_attempt: dict[str, Any]) -> dict[str, Any]:
+        logging.info(f"Testing attempt `{kafka_attempt["spec"]}`")
+        # TODO: validate json
+
+        attempt = Attempt(**kafka_attempt)
+        attempt.language = Language(**kafka_attempt["language"])
+        attempt.task = Task(**kafka_attempt["task"])
+        attempt.task.constraints = Constraints(**kafka_attempt["task"]["constraints"])
+        attempt.task.tests = [
+            TaskTest(**task_test) for task_test in kafka_attempt["task"]["tests"]
+        ]
+
+        if kafka_attempt["task"]["checker"] is not None:
+            attempt.task.checker = Checker(**kafka_attempt["task"]["checker"])
+            attempt.task.checker.language = Language(
+                **kafka_attempt["task"]["checker"]["language"]
+            )
+
+        return self._manager.start(attempt)
 
     def detect_ai(self, tested_attempt: dict[str, Any]):
         # TODO: Add logic
@@ -63,7 +88,8 @@ class Listener:
 
         sdf_tested = sdf.apply(self.test_attempt)
 
-        sdf2 = sdf_tested.apply(self.set_finished).to_topic(status_topic)
+        # TODO: is assignment needed
+        _sdf2 = sdf_tested.apply(self.set_finished).to_topic(status_topic)
 
         sdf_tested = sdf_tested.update(self.detect_ai).to_topic(output_topic)
 
