@@ -1,156 +1,77 @@
 """Contains data models"""
 
-from typing import Any
+from dataclasses import dataclass
+from typing import Optional
 
 
-class BasicTaskInfo:
-    """Basic task info model"""
-
-    class Checker:
-        """BasicTaskInfo Checker class"""
-
-        def __init__(self, checker_dict: dict[str, Any]) -> None:
-            self.language: int = checker_dict["language"]
-            self.source_code: str = checker_dict["sourceCode"]
-
-        def to_dict(self) -> dict[str, Any]:
-            """Converts class to dict object
-
-            Returns:
-                dict
-            """
-            return {
-                "language": self.language,
-                "sourceCode": self.source_code,
-            }
-
-    def __init__(self, item_dict: dict[str, Any]) -> None:
-        self.task_type: int = item_dict["taskType"]
-        self.check_type: int = item_dict["checkType"]
-        self.checker = None
-        if item_dict["checker"] is not None:
-            self.checker = self.Checker(item_dict["checker"])
-
-    def to_dict(self) -> dict[str, Any]:
-        """Converts class to dict object
-
-        Returns:
-            dict
-        """
-        return {
-            "taskType": self.task_type,
-            "checkType": self.check_type,
-            "checker": self.checker.to_dict() if self.checker else None,
-        }
-
-
+@dataclass
 class TaskTest:
-    """Task test model"""
-
-    def __init__(self, test_dict: dict[str, Any]) -> None:
-        self.spec: str = test_dict["spec"]
-        self.input_data: str = test_dict["inputData"]
-        self.output_data: str = test_dict["outputData"]
+    spec: str
+    input_data: str
+    output_data: str
 
 
-class Attempt:
-    """Attempt model"""
-
-    class Constraints:
-        """Constraints model"""
-
-        def __init__(self, constraints_dict: dict[str, Any]):
-            self.time = constraints_dict["time"]
-            self.memory = constraints_dict["memory"]
-
-        def to_dict(self) -> dict[str, Any]:
-            """Converts class to dict object
-
-            Returns:
-                dict
-            """
-            return {
-                "time": self.time,
-                "memory": self.memory,
-            }
-
-    class Result:
-        """Attempt result model"""
-
-        def __init__(self, result_dict: dict[str, Any]):
-            self.test: str = result_dict["test"]
-            self.verdict: int = result_dict["verdict"]
-
-        def to_dict(self):
-            """Converts class to dict object
-
-            Returns:
-                dict
-            """
-            return {
-                "test": self.test,
-                "verdict": self.verdict,
-            }
-
-    def __init__(self, attempt_dict: dict[str, Any]):
-        self.spec: str = attempt_dict["spec"]
-        self.origin: str = attempt_dict["origin"]
-        self.author: str = attempt_dict["author"]
-        self.language: str = attempt_dict["language"]
-        self.status: int = attempt_dict["status"]
-        self.constraints = self.Constraints(attempt_dict["constraints"])
-        self.program_text: str = attempt_dict["programText"]
-        self.text_answers: list[str] = attempt_dict["textAnswers"]
-        self.date: str = attempt_dict["date"]
-        self.results = [self.Result(result) for result in attempt_dict["results"]]
-        self.verdict: int = attempt_dict["verdict"]
-        self.verdict_test: int = 0
-        self.logs: list[str] = attempt_dict["logs"]
-
-    def to_dict(self):
-        """Converts class to dict object
-
-        Returns:
-            dict
-        """
-        return {
-            "spec": self.spec,
-            "origin": self.origin,
-            "author": self.author,
-            "language": self.language,
-            "status": self.status,
-            "constraints": self.constraints.to_dict(),
-            "program_text": self.program_text,
-            "textAnswers": self.text_answers,
-            "date": self.date,
-            "results": self.results,
-            "verdict": self.verdict,
-            "verdictTest": self.verdict_test,
-            "logs": self.logs,
-        }
-
-
+@dataclass
 class Language:
-    """Language model"""
+    spec: int
+    name: str
+    shortName: str
+    extensions: list[str]
+    runOffset: float
+    compileOffset: float
+    memOffset: int
 
-    def __init__(self, language_dict: dict[str, Any]):
-        self.spec: int = int(language_dict["spec"])
 
-        self.short_name: str = language_dict["shortName"]
-        self.run_offset: float = language_dict["runOffset"]
-        self.compile_offset: float = language_dict["compileOffset"]
-        self.mem_offset: float = language_dict["memOffset"]
+@dataclass
+class Checker:
+    language: Language
+    sourceCode: str
 
-    def to_dict(self):
-        """Converts class to dict object
 
-        Returns:
-            dict
-        """
-        return {
-            "spec": self.spec,
-            "shortName": self.short_name,
-            "runOffset": self.run_offset,
-            "compileOffset": self.compile_offset,
-            "memOffset": self.mem_offset,
-        }
+@dataclass
+class Constraints:
+    time: float
+    memory: int
+
+
+@dataclass
+class Task:
+    spec: str
+    tests: list[TaskTest]
+    test_groups: list[int]
+    checkType: int
+    taskType: int
+    constraints: Constraints
+    checker: Optional[Checker]
+
+
+@dataclass
+class Attempt:
+    spec: str
+    programText: str
+    textAnswers: list[str]
+    language: Language
+    date: str
+    organization: str
+    task: Task
+    author: str
+
+
+@dataclass
+class Result:
+    test: str
+    verdict: int
+
+
+@dataclass
+class ProcessedAttempt:
+    spec: str
+    programText: str
+    language: int
+    date: str
+    organization: str
+    author: str
+    results: list[Result]
+    verdict: int
+    verdictTest: int
+    logs: list[str]

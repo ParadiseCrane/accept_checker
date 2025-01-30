@@ -9,7 +9,6 @@ from typing import Literal
 
 import psutil
 
-from database import Database
 from models import Attempt
 from settings import SETTINGS_MANAGER
 from utils.soft_mkdir import soft_mkdir
@@ -106,7 +105,7 @@ def map_attempt_status(
     return ATTEMPT_STATUS_DICT[attempt_status]
 
 
-async def send_alert(
+def send_alert(
     title: str,
     message: str,
     status: str = "error",
@@ -128,7 +127,8 @@ async def send_alert(
         }
     )
 
-    await Database().insert_one("checker_alert", alert)
+    # TODO: check alert
+    print(alert)
 
 
 def delete_folder(path: str):

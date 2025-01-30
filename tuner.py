@@ -140,7 +140,7 @@ class Tuner:
         return compile_result, run_result
 
     def _tune_language(self, language: Language) -> tuple[float, float, int]:
-        language_class: ProgramLanguage = get_language_class(language.short_name)
+        language_class: ProgramLanguage = get_language_class(language.shortName)
 
         time_offset_code, mem_offset_code = language_class.get_offset_codes()
         compile_offset_seconds, run_offset_seconds = self._run_test(
@@ -182,7 +182,7 @@ class Tuner:
                 )
             except BaseException as exc:  # pylint:disable=W0718
                 await send_alert(
-                    "Tuner failure", f"language {language.short_name}\n{str(exc)}"
+                    "Tuner failure", f"language {language.shortName}\n{str(exc)}"
                 )
                 continue
 

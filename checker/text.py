@@ -29,7 +29,7 @@ class TextChecker(Checker):
 
         return all_correct, verdicts
 
-    async def start(
+    def start(
         self,
         user_answers: list[str],
         correct_answers: list[str],

@@ -10,7 +10,7 @@ from utils.basic import generate_program_name, generate_tests_verdicts, map_verd
 class TestsChecker(CodeChecker):
     """Provides evaluation for simple tests tasks"""
 
-    async def start(  # pylint:disable=W0221:arguments-differ
+    def start(  # pylint:disable=W0221:arguments-differ
         self,
         attempt: Attempt,
         grouped_tests: list[list[TaskTest]],
@@ -32,13 +32,13 @@ class TestsChecker(CodeChecker):
         tests_number = sum(map(len, grouped_tests))
 
         try:
-            language_class = get_language_class(language.short_name)
+            language_class = get_language_class(language.shortName)
         except BaseException as exc:  # pylint: disable=W0718
             return (
                 generate_tests_verdicts("SE", tests_number),
                 [
                     f"Attempt {attempt.spec}",
-                    f"No language with short name '{language.short_name}'",
+                    f"No language with short name '{language.shortName}'",
                     str(exc),
                 ],
             )
@@ -47,7 +47,7 @@ class TestsChecker(CodeChecker):
 
         try:
             self.write_program_text(
-                folder_path, program_name, attempt.program_text, language_class
+                folder_path, program_name, attempt.programText, language_class
             )
         except BaseException as exc:  # pylint: disable=W0718
             return (
@@ -57,7 +57,7 @@ class TestsChecker(CodeChecker):
 
         try:
             self.compile_program(
-                folder_path, program_name, language_class, language.compile_offset
+                folder_path, program_name, language_class, language.compileOffset
             )
         except CompilationErrorException:
             return (generate_tests_verdicts("CE", tests_number), [])

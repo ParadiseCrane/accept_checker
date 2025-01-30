@@ -5,7 +5,7 @@ from typing import Optional
 from checker.basic import CodeChecker
 from custom_exceptions import CompilationErrorException
 from custom_process import CustomProcess
-from models import Attempt, BasicTaskInfo, Language, TaskTest
+from models import Attempt, Language, TaskTest, Checker
 from program_languages.utils import get_language_class
 from utils.basic import (
     VerdictType,
@@ -52,9 +52,9 @@ class CustomChecker(CodeChecker):
 
         return map_verdict("WA")
 
-    async def start(  # pylint:disable=W0221
+    def start(  # pylint:disable=W0221
         self,
-        checker: BasicTaskInfo.Checker,
+        checker: Checker,
         attempt: Attempt,
         grouped_tests: list[list[TaskTest]],
         folder_path: str,
@@ -78,24 +78,24 @@ class CustomChecker(CodeChecker):
         tests_number = sum(map(len, grouped_tests))
 
         try:
-            program_language_class = get_language_class(program_language.short_name)
+            program_language_class = get_language_class(program_language.shortName)
         except BaseException as exc:  # pylint: disable=W0718
             return (
                 generate_tests_verdicts("SE", tests_number),
                 [
                     f"Attempt {attempt.spec}",
-                    f"No language with short name '{program_language.short_name}'",
+                    f"No language with short name '{program_language.shortName}'",
                     str(exc),
                 ],
             )
         try:
-            checker_language_class = get_language_class(checker_language.short_name)
+            checker_language_class = get_language_class(checker_language.shortName)
         except BaseException as exc:  # pylint: disable=W0718
             return (
                 generate_tests_verdicts("SE", tests_number),
                 [
                     f"Attempt {attempt.spec}",
-                    f"No language with short name '{checker_language.short_name}'",
+                    f"No language with short name '{checker_language.shortName}'",
                     str(exc),
                 ],
             )
@@ -104,7 +104,7 @@ class CustomChecker(CodeChecker):
 
         try:
             self.write_program_text(
-                folder_path, checker_name, checker.source_code, checker_language_class
+                folder_path, checker_name, checker.sourceCode, checker_language_class
             )
         except BaseException as exc:  # pylint: disable=W0718
             return (
@@ -117,7 +117,7 @@ class CustomChecker(CodeChecker):
                 folder_path,
                 checker_name,
                 checker_language_class,
-                checker_language.compile_offset,
+                checker_language.compileOffset,
             )
         except CompilationErrorException:
             return (generate_tests_verdicts("CH", tests_number), [])
@@ -137,7 +137,7 @@ class CustomChecker(CodeChecker):
 
         try:
             self.write_program_text(
-                folder_path, program_name, attempt.program_text, program_language_class
+                folder_path, program_name, attempt.programText, program_language_class
             )
         except BaseException as exc:  # pylint: disable=W0718
             return (
@@ -150,7 +150,7 @@ class CustomChecker(CodeChecker):
                 folder_path,
                 program_name,
                 program_language_class,
-                program_language.compile_offset,
+                program_language.compileOffset,
             )
         except CompilationErrorException:
             return (generate_tests_verdicts("CE", tests_number), [])

@@ -1,14 +1,16 @@
 """Contains Listener for database updates class"""
 
 import os
+import logging
 
 from typing import Any
 from quixstreams import Application
 from utils.basic import map_attempt_status
+from models import Attempt, ProcessedAttempt
 
+from manager import Manager
 from local_secrets import SECRETS_MANAGER
 from settings import SETTINGS_MANAGER
-# from manager import Manager
 
 
 class Listener:
@@ -17,7 +19,7 @@ class Listener:
     _manager_path = os.path.join(".", "manager.py")
 
     def __init__(self) -> None:
-        # self._manager = Manager()
+        self._manager = Manager()
         self._kafka_string = SECRETS_MANAGER.kafka_string
         self._debug = SECRETS_MANAGER.debug
 
@@ -37,9 +39,10 @@ class Listener:
     def set_finished(self, attempt: dict[str, Any]) -> dict[str, Any]:
         return {"spec": attempt["spec"], "status": map_attempt_status("finished")}
 
-    def test_attempt(self, attempt: dict[str, Any]) -> dict[str, Any]:
-        # TODO: Add logic
-        return attempt
+    def test_attempt(self, attempt: dict[str, Any]) -> ProcessedAttempt:
+        logging.info(f"Testing attempt `{attempt["spec"]}`")
+        result = self._manager.start(Attempt(**attempt))
+        return result
 
     def detect_ai(self, tested_attempt: dict[str, Any]):
         # TODO: Add logic

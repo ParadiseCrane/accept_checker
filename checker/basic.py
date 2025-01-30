@@ -53,7 +53,7 @@ class Checker:
 class CodeChecker(Checker):
     """Code checker basic class"""
 
-    async def start(self) -> tuple[list[int], list[str]]:
+    def start(self) -> tuple[list[int], list[str]]:
         raise NotImplementedError
 
     def write_program_text(
@@ -130,10 +130,10 @@ class CodeChecker(Checker):
         try:
             result = process.run(
                 input_data=task_tests[index].input_data,
-                time_limit=attempt.constraints.time,
-                time_offset=language.run_offset,
-                memory_offset=language.mem_offset,
-                memory_limit=attempt.constraints.memory << 20,
+                time_limit=attempt.task.constraints.time,
+                time_offset=language.runOffset,
+                memory_offset=language.memOffset,
+                memory_limit=attempt.task.constraints.memory << 20,
             )
 
         except TimeLimitException:
