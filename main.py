@@ -3,12 +3,12 @@
 import asyncio
 
 from listener import LISTENER
-from scheduler import SCHEDULER
+# from scheduler import SCHEDULER
 
 
 async def main():
     """Main function"""
-    SCHEDULER.start()
+    # SCHEDULER.start()
     await LISTENER.start()
 
 

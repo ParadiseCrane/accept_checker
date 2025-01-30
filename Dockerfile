@@ -48,18 +48,26 @@ RUN wget "https://go.dev/dl/go1.23.4.linux-amd64.tar.gz" -O go.tar.gz && \
   rm go.tar.gz
 ENV PATH="$PATH:/usr/local/go/bin"
 
+RUN apk add --no-cache librdkafka librdkafka-dev
+
 FROM prepare AS builder
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 ENV UV_LINK_MODE=copy
 
-COPY uv.lock pyproject.toml /app/
-WORKDIR /app
+# Install dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project --no-editable
 
-RUN uv sync --frozen
 
 FROM builder AS runner
 
 ADD . /app/
 WORKDIR /app
+
+# Sync the project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-editable
 
 CMD ["uv", "run", "main.py"]
