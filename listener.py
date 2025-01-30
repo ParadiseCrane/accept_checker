@@ -21,7 +21,8 @@ from local_secrets import SECRETS_MANAGER
 from settings import SETTINGS_MANAGER
 
 
-logging.getLogger("Listener")
+logger = logging.getLogger("Listener")
+logger.setLevel(logging.INFO)
 
 
 class Listener:
@@ -51,7 +52,7 @@ class Listener:
         return {"spec": tested_attempt["spec"], "status": map_attempt_status("finished")}
 
     def test_attempt(self, kafka_attempt: dict[str, Any]) -> dict[str, Any]:
-        logging.info(f"Testing attempt `{kafka_attempt["spec"]}`")
+        logger.info(f"Testing attempt `{kafka_attempt["spec"]}`")
         # TODO: validate json
 
         attempt = Attempt(**kafka_attempt)
@@ -80,7 +81,7 @@ class Listener:
     async def start(self):
         """Starts listener loop"""
 
-        app = Application(self._kafka_string, consumer_group="checker")
+        app = Application(self._kafka_string, consumer_group="checker", loglevel="WARNING")
 
         input_topic = app.topic(
             name="attempt_checker",

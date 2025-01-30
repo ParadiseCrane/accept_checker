@@ -20,7 +20,8 @@ from utils.basic import (
     send_alert,
 )
 
-logging.getLogger("Manager")
+logger = logging.getLogger("Manager")
+logger.setLevel(logging.INFO)
 
 
 def _soft_run(func: Callable[..., Any]) -> Callable[..., ProcessedAttempt]:
@@ -245,7 +246,7 @@ class Manager:
         for test in task.tests:
             task_tests_map[test.spec] = test
 
-        logging.info(f"Testing attempt `{attempt.spec}`")
+        logger.info(f"Testing attempt `{attempt.spec}`")
 
         result = self._task_type_handler[task.taskType](
             attempt,
