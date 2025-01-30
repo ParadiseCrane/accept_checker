@@ -1,9 +1,10 @@
 """Contains the SecretsManager class instances"""
 
 import os
-from typing import Any
 
-import dotenv
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class SecretsManager:
@@ -11,11 +12,12 @@ class SecretsManager:
 
     def __init__(self, path: str = os.path.join(".", ".env")) -> None:
         self._path = path
-        self._secrets: dict[str, Any] = dotenv.dotenv_values(self._path)
-        self._mongodb_connection_string: str = self._secrets["CONNECTION_STRING"]
-        self._mongodb_database: str = self._secrets["DATABASE"]
-        self._kafka_connection_string: str = self._secrets["KAFKA_CONNECTION"]
-        self._debug = bool(self._secrets["DEBUG"])
+        self._mongodb_connection_string: str = os.getenv("CONNECTION_STRING") or ""
+        self._mongodb_database: str = os.getenv("DATABASE") or "test"
+        self._kafka_connection_string: str = (
+            os.getenv("KAFKA_CONNECTION") or "localhost:9092"
+        )
+        self._debug = bool(os.getenv("DEBUG"))
 
     @property
     def debug(self) -> bool:
@@ -42,7 +44,7 @@ class SecretsManager:
         Returns:
             str: MongoDB database name
         """
-        return self.database
+        return self._mongodb_database
 
     @property
     def kafka_string(self) -> str:

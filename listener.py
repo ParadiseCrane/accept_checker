@@ -1,17 +1,14 @@
 """Contains Listener for database updates class"""
 
-import concurrent.futures as pool
-import json
 import os
-import subprocess
-import sys
-import time
-from typing import Any, Callable
 
-from aiokafka import AIOKafkaConsumer
+from typing import Any
+from quixstreams import Application
+from utils.basic import map_attempt_status
 
 from local_secrets import SECRETS_MANAGER
 from settings import SETTINGS_MANAGER
+# from manager import Manager
 
 
 class Listener:
@@ -20,6 +17,7 @@ class Listener:
     _manager_path = os.path.join(".", "manager.py")
 
     def __init__(self) -> None:
+        # self._manager = Manager()
         self._kafka_string = SECRETS_MANAGER.kafka_string
         self._debug = SECRETS_MANAGER.debug
 
@@ -33,101 +31,40 @@ class Listener:
             int(self.cpu_number * self.settings.cpu_utilization_fraction),
         )
 
-    @staticmethod
-    def submit_to_manager(
-        attempt_spec: str,
-        author_login: str,
-        task_spec: str,
-    ) -> None:
-        """Submits attempt to Manager in separate process
+    def set_testing(self, attempt: dict[str, Any]) -> dict[str, Any]:
+        return {"spec": attempt["spec"], "status": map_attempt_status("testing")}
 
-        Args:
-            attempt_spec (str): spec of attempt
-            author_login (str): login of author
-            task_spec (str): spec of task
-        """
+    def set_finished(self, attempt: dict[str, Any]) -> dict[str, Any]:
+        return {"spec": attempt["spec"], "status": map_attempt_status("finished")}
 
-        try:
-            subprocess.run(
-                [
-                    "python",
-                    Listener._manager_path,
-                    attempt_spec,
-                    author_login,
-                    task_spec,
-                ],
-                check=True,
-                capture_output=True,
-            )
+    def test_attempt(self, attempt: dict[str, Any]) -> dict[str, Any]:
+        # TODO: Add logic
+        return attempt
 
-        except BaseException as exception:  # pylint:disable=W0718
-            print("Listener error", f"Error when starting manager: {exception}")
-
-    def attempt_checked(self, attempt_spec):
-        self.busy_cpu -= 1
-        if self._debug:
-            print(f"attempt {attempt_spec} checked!")
-
-    def _get_attempt_spec_callback(self, attempt_spec: str) -> Callable[[Any], None]:
-        return lambda _: self.attempt_checked(attempt_spec)
+    def detect_ai(self, tested_attempt: dict[str, Any]):
+        # TODO: Add logic
+        tested_attempt.update({"detect_ai": True})
 
     async def start(self):
         """Starts listener loop"""
 
-        consumer = AIOKafkaConsumer(
-            "attempt",
-            bootstrap_servers=self._kafka_string,
-            auto_commit_interval_ms=1000,
-            auto_offset_reset="earliest",
-            group_id="kafka_test",
-        )
+        app = Application(self._kafka_string, consumer_group="checker")
 
-        await consumer.start()
+        input_topic = app.topic("attempt_checker")
+        output_topic = app.topic("attempt_detect_ai")
+        status_topic = app.topic("attempt_status")
 
-        try:
-            while True:
-                if self.busy_cpu >= self.max_workers:
-                    time.sleep(self.settings.sleep_timeout_seconds)
-                    continue
-                with pool.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-                    result = await consumer.getmany(
-                        max_records=self.max_workers - self.busy_cpu, timeout_ms=10000
-                    )
-                    for _, attempts in result.items():
-                        for attempt in attempts:
-                            if attempt.value is None:
-                                continue
-                            attempt = attempt.value.decode("utf-8")
-                            attempt = json.loads(attempt)
+        sdf = app.dataframe(input_topic)
 
-                            attempt_spec = attempt["attempt"]
-                            author_login = attempt["author"]
-                            task_spec = attempt["task"]
-                            organization_spec = attempt["organization"]
+        sdf.apply(self.set_testing).to_topic(status_topic)
 
-                            if self._debug:
-                                print(
-                                    f"\nattempt: {attempt_spec}\n\tlogin: {author_login}\n\ttask: {task_spec}\n\torg: {organization_spec}"
-                                )
+        sdf_tested = sdf.apply(self.test_attempt)
 
-                            self.busy_cpu += 1
-                            future = executor.submit(
-                                Listener.submit_to_manager,
-                                attempt_spec,
-                                author_login,
-                                task_spec,
-                            )
+        sdf2 = sdf_tested.apply(self.set_finished).to_topic(status_topic)
 
-                            future.add_done_callback(
-                                self._get_attempt_spec_callback(attempt_spec)
-                            )
+        sdf_tested = sdf_tested.update(self.detect_ai).to_topic(output_topic)
 
-        except KeyboardInterrupt:
-            print("\nExit")
-            sys.exit(0)
-        finally:
-            if consumer:
-                await consumer.stop()
+        app.run()
 
 
 LISTENER = Listener()
