@@ -70,7 +70,10 @@ class Listener:
         return self._manager.start(attempt)
 
     def detect_ai(self, tested_attempt: dict[str, Any]):
-        # TODO: Add logic
+        if tested_attempt["language"] not in [1, 2]: # Python, Pypy
+            return
+        if tested_attempt["verdict"] != 0: # OK
+            return
         tested_attempt.update({"detect_ai": True})
 
     async def start(self):
