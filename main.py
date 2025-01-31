@@ -1,16 +1,13 @@
 """Starts the listener and the scheduler"""
-
-import asyncio
-
 from listener import LISTENER
 # from scheduler import SCHEDULER
 
 
-async def main():
+def main():
     """Main function"""
     # SCHEDULER.start()
-    await LISTENER.start()
+    LISTENER.start()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
