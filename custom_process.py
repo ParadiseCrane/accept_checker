@@ -79,6 +79,8 @@ class CustomProcess:
         time_bound = time_limit + time_offset
         memory_bound = memory_limit + memory_offset
 
+        print("Run process")
+
         process = psutil.Popen(
             self.cmd,
             text=True,

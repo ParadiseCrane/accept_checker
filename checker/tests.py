@@ -1,11 +1,14 @@
 """Contains Tests Checker class"""
 
+import logging
 from checker.basic import CodeChecker
 from custom_exceptions import CompilationErrorException
 from models import Attempt, Language, TaskTest
 from program_languages.utils import get_language_class
 from utils.basic import generate_program_name, generate_tests_verdicts, map_verdict
 
+logger = logging.getLogger("TestsChecker")
+logger.setLevel(logging.INFO)
 
 class TestsChecker(CodeChecker):
     """Provides evaluation for simple tests tasks"""
@@ -66,6 +69,9 @@ class TestsChecker(CodeChecker):
                 generate_tests_verdicts("SE", tests_number),
                 [f"Attempt {attempt.spec}", str(exc)],
             )
+
+        logger.info("TestsChecker before run tests")
+
 
         ok_verdict_spec = map_verdict("OK")
 

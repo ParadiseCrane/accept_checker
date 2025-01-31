@@ -42,7 +42,7 @@ class CustomChecker(CodeChecker):
 
         try:
             checker_output = self.checker_process.run(
-                f"{task_tests[index].input_data}\n{program_output.strip()}",
+                f"{task_tests[index].inputData}\n{program_output.strip()}",
             ).strip()
 
             if checker_output == self._checker_ok_output:

@@ -66,6 +66,8 @@ FROM builder AS runner
 ADD . /app/
 WORKDIR /app
 
+ENV DOCKER 1
+
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-editable

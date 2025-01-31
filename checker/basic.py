@@ -129,7 +129,7 @@ class CodeChecker(Checker):
         result = None
         try:
             result = process.run(
-                input_data=task_tests[index].input_data,
+                input_data=task_tests[index].inputData,
                 time_limit=attempt.task.constraints.time,
                 time_offset=language.runOffset,
                 memory_offset=language.memOffset,
@@ -162,7 +162,7 @@ class CodeChecker(Checker):
         if program_output is None:
             return map_verdict("WA")
 
-        if self._compare_strings(program_output, task_tests[index].output_data):
+        if self._compare_strings(program_output, task_tests[index].outputData):
             return map_verdict("OK")
         return map_verdict("WA")
 

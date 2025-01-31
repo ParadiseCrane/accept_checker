@@ -181,13 +181,15 @@ class Manager:
         folder_path = create_program_folder(attempt.spec)
 
         tests_checker = self.tests_checker_class()
-
+        logger.info(f"Starting testing of attempt `{attempt.spec}`")
         verdicts, logs = tests_checker.start(
             attempt,
             grouped_tests,
             folder_path,
             language,
         )
+        logger.info(f"Tested attempt `{attempt.spec}`")
+        logger.info(verdicts)
 
         delete_folder(folder_path)
 
@@ -243,8 +245,6 @@ class Manager:
         task_tests_map: dict[str, TaskTest] = dict()  # spec : TaskTest
         for test in task.tests:
             task_tests_map[test.spec] = test
-
-        logger.info(f"Testing attempt `{attempt.spec}`")
 
         result = self._task_type_handler[task.taskType](
             attempt,
