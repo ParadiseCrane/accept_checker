@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "apscheduler>=3.11.0",
-    "confluent-kafka>=2.8.0",
+    "confluent-kafka==2.4.0",
     "motor>=3.6.0",
     "psutil>=6.1.0",
     "pylint>=3.3.1",

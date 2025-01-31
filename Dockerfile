@@ -48,7 +48,7 @@ RUN wget "https://go.dev/dl/go1.23.4.linux-amd64.tar.gz" -O go.tar.gz && \
   rm go.tar.gz
 ENV PATH="$PATH:/usr/local/go/bin"
 
-RUN apk add --no-cache librdkafka librdkafka-dev
+RUN apk add --no-cache librdkafka-dev
 
 FROM prepare AS builder
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/

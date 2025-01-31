@@ -3,12 +3,11 @@
 import os
 import logging
 import json
-from time import sleep
+import uuid
 
 from typing import Any
-# from quixstreams import Application
-# from quixstreams.models import TopicConfig
 from confluent_kafka import Consumer, Producer
+from confluent_kafka.admin import AdminClient, NewTopic
 from utils.basic import map_attempt_status
 from models import (
     Attempt,
@@ -23,14 +22,26 @@ from manager import Manager
 from local_secrets import SECRETS_MANAGER
 from settings import SETTINGS_MANAGER
 
-logging.basicConfig(level=logging.INFO)
+def create_topic(kafka_connection: str):
+    global topic
+    a = AdminClient({'bootstrap.servers': kafka_connection})
+    new_topics = [NewTopic("attempt_checker", num_partitions=12)]
+
+    fs = a.create_topics(new_topics)
+    for topic, f in fs.items():
+        try:
+            f.result()  # The result itself is None
+            print("Topic {} created".format(topic))
+        except Exception as e:
+            print("Failed to create topic {}: {}".format(topic, e))
 
 class Listener:
     """Listens to database updates"""
 
     _manager_path = os.path.join(".", "manager.py")
 
-    def __init__(self):
+    def __init__(self, logger: logging.Logger):
+        self.logging = logger
         self._manager = Manager()
         self._kafka_string = SECRETS_MANAGER.kafka_string
         self._debug = SECRETS_MANAGER.debug
@@ -44,9 +55,11 @@ class Listener:
             2,
             int(self.cpu_number * self.settings.cpu_utilization_fraction),
         )
+        create_topic(self._kafka_string)
         self.producer = Producer({'bootstrap.servers': self._kafka_string})
         self.consumer = Consumer({
             'bootstrap.servers': self._kafka_string,
+            "client.id": uuid.uuid4(),
             'group.id': 'checker',
             'auto.offset.reset': 'earliest'
         })
@@ -54,35 +67,38 @@ class Listener:
         self.running = True
 
     def __del__(self):
-        self.consumer.close()
-        self.producer.flush()
+        if self.consumer:
+            self.consumer.close()
+        if self.producer:
+            self.producer.flush()
 
     def produce(self, topic: str, data: dict[str, Any]):
         payload = json.dumps(data).encode("utf-8")
         self.producer.produce(
             topic,
-            payload
+            payload,
+            key=data["spec"]
         )
-        self.producer.poll(0)
+        self.producer.flush()
 
     def set_testing(self, attempt: dict[str, Any]):
-        logging.info("Set testing")
+        self.logging.info(f"Set status of attempt `{attempt["spec"]}` to `testing`")
         self.produce("attempt_status", {"spec": attempt["spec"], "status": map_attempt_status("testing")})
 
     def set_finished(self, tested_attempt: dict[str, Any]):
-        logging.info("Set finished")
+        self.logging.info(f"Set status of attempt `{tested_attempt["spec"]}` to `finished`")
         self.produce("attempt_status", {"spec": tested_attempt["spec"], "status": map_attempt_status("finished")})
 
     def sink_attempt(self, tested_attempt: dict[str, Any]):
-        logging.info("Sink attempt")
+        self.logging.info(f"Saving data fo tested attempt `{tested_attempt["spec"]}`")
         self.produce("attempt_sink", tested_attempt)
 
     def detect_ai(self, tested_attempt: dict[str, Any]):
-        logging.info("Send to detect ai")
+        self.logging.info(f"Sending attempt `{tested_attempt["spec"]}` to detect ai")
         self.produce("attempt_detect_ai", tested_attempt)
 
     def test_attempt(self, kafka_attempt: dict[str, Any]) -> dict[str, Any]:
-        logging.info(f"Testing attempt `{kafka_attempt["spec"]}`")
+        self.logging.info(f"Testing attempt `{kafka_attempt["spec"]}`")
         # TODO: validate json
 
         attempt = Attempt(**kafka_attempt)
@@ -99,19 +115,17 @@ class Listener:
                 **kafka_attempt["task"]["checker"]["language"]
             )
 
-
-        sleep(2)
         return self._manager.start(attempt)
 
     def start(self):
         """Starts listener loop"""
-
+        self.logging.info("Started")
         while self.running:
             msg = self.consumer.poll(0.5)
 
             if msg is None:
                 continue
-            logging.info("Polled message")
+            self.logging.info("Polled message")
             if msg.error():
                 continue
 
@@ -131,5 +145,3 @@ class Listener:
             if tested_attempt["language"] not in [1, 2] or tested_attempt["verdict"] != 0:
                 self.sink_attempt(tested_attempt)
             self.detect_ai(tested_attempt)
-
-LISTENER = Listener()

@@ -83,21 +83,21 @@ class Manager:
         self,
         results: list[Result],
         verdicts: list[int],
-    ) -> tuple[int, int]:
+    ) -> tuple[list[Result], int, int]:
         for idx, result in enumerate(results):
             results[idx].verdict = verdicts[idx]
 
         attempt_final_verdict = map_verdict("NT")
         attempt_final_verdict_test = 0
 
-        for result in results:
-            attempt_final_verdict = result.verdict
-            if result.verdict != 0:
+        for idx in range(len(results)):
+            attempt_final_verdict = results[idx].verdict
+            if results[idx].verdict != map_verdict("OK"):
                 break
             attempt_final_verdict_test += 1
         else:
             attempt_final_verdict_test -= 1
-        return attempt_final_verdict, attempt_final_verdict_test
+        return results, attempt_final_verdict, attempt_final_verdict_test
 
     def _save_results(
         self,
@@ -105,8 +105,9 @@ class Manager:
         verdicts: list[int],
         logs: list[str],
     ) -> ProcessedAttempt:
-        results = [Result(test=test.spec, verdict=0) for test in attempt.task.tests]
+        results = [Result(test=test.spec, verdict=map_verdict("NT")) for test in attempt.task.tests]
         (
+            results,
             verdict,
             verdict_test,
         ) = self._get_attempt_final_info(results, verdicts)
@@ -120,7 +121,7 @@ class Manager:
             language=attempt.language.spec,
             organization=attempt.organization,
             programText=attempt.programText,
-            results=[],
+            results=results,
             verdict=verdict,
             verdictTest=verdict_test,
             logs=logs,
@@ -232,10 +233,7 @@ class Manager:
         """Starts Manager for given pending item
 
         Args:
-            attempt_spec (str): attempt spec
-            author_login (str): author login
-            task_spec (str): task spec
-            organization_spec (str): organization spec
+            attempt_spec (Attempt): attempt with all needed information
         """
 
         task = attempt.task
